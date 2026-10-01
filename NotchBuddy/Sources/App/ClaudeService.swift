@@ -92,8 +92,8 @@ final class KeychainStore: @unchecked Sendable {
 }
 
 // MARK: - CLI Companion Service
-// Lumo operates as a passive and interactive HUD for the Antigravity CLI (`agy`).
-// Model inference is executed natively in your terminal via your Google One AI Premium (Ultra) subscription.
+// Lumo operates as a companion for the Antigravity CLI (`agy`).
+// Model inference is executed natively via your Google One AI Premium (Ultra) subscription.
 
 @MainActor
 final class ClaudeService {
@@ -105,10 +105,104 @@ final class ClaudeService {
         AppState.shared.chatHistory.removeAll()
     }
 
+    private func resolveAgyPath() -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let candidates = [
+            "\(home)/.local/bin/agy",
+            "/usr/local/bin/agy",
+            "/opt/homebrew/bin/agy",
+            "\(home)/bin/agy"
+        ]
+        for p in candidates {
+            if FileManager.default.isExecutableFile(atPath: p) {
+                return p
+            }
+        }
+        // Fallback to which agy
+        let whichProc = Process()
+        whichProc.launchPath = "/usr/bin/which"
+        whichProc.arguments = ["agy"]
+        let pipe = Pipe()
+        whichProc.standardOutput = pipe
+        try? whichProc.run()
+        whichProc.waitUntilExit()
+        if whichProc.terminationStatus == 0 {
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !str.isEmpty, FileManager.default.isExecutableFile(atPath: str) {
+                return str
+            }
+        }
+        return nil
+    }
+
     func chat(query: String, context: PromptContext?, state: AppState) async {
+        guard let agyPath = resolveAgyPath() else {
+            state.stateOverride = nil
+            state.chatHistory.append(ChatMessage(role: .assistant, content: "Could not locate `agy` executable. Please verify that Antigravity CLI is installed at ~/.local/bin/agy."))
+            return
+        }
+
+        var fullPrompt = query
+        if let ctx = context {
+            switch ctx {
+            case .window(let appName, let title, let url):
+                let urlStr = url.map { " (\($0))" } ?? ""
+                fullPrompt = "[Context: App: \(appName), Window: \(title)\(urlStr)]\n\n" + query
+            case .file(let name, let fileURL):
+                if let url = fileURL, let fileData = try? String(contentsOf: url, encoding: .utf8) {
+                    fullPrompt = "[Attached file \(name):\n\(fileData.prefix(500))]\n\n" + query
+                } else {
+                    fullPrompt = "[Attached file: \(name)]\n\n" + query
+                }
+            }
+        }
+
+        state.stateOverride = .thinking
+
+        let result: String = await Task.detached(priority: .userInitiated) { () -> String in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: agyPath)
+            // -c continues recent session context; -p prints response
+            process.arguments = ["-c", "-p", fullPrompt]
+
+            var env = ProcessInfo.processInfo.environment
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            let currentPath = env["PATH"] ?? ""
+            env["PATH"] = "\(home)/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:\(currentPath)"
+            process.environment = env
+
+            let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
+            process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+                let outString = String(data: stdoutData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let errString = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+                if !outString.isEmpty {
+                    return outString
+                } else if !errString.isEmpty {
+                    return errString
+                } else {
+                    return "No response from Antigravity."
+                }
+            } catch {
+                return "Failed to run agy: \(error.localizedDescription)"
+            }
+        }.value
+
         state.stateOverride = nil
-        let response = "Lumo is connected to your Antigravity CLI as an interactive HUD. Run `agy` in your terminal to chat and execute tools with your Gemini Ultra subscription."
-        state.chatHistory.append(ChatMessage(role: .assistant, content: response))
+        state.chatHistory.append(ChatMessage(role: .assistant, content: result))
+        SoundEngine.shared.play("finish")
     }
 }
+
 
