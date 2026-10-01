@@ -32,6 +32,11 @@ final class AntigravityHookInstaller: Sendable {
         return true
     }
 
+    static var cliSettingsURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".gemini/antigravity-cli/settings.json")
+    }
+
     @discardableResult
     func install() -> Bool {
         let dir = Self.lumoDir
@@ -46,8 +51,31 @@ final class AntigravityHookInstaller: Sendable {
             return false
         }
 
-        // 2. Patch ~/.gemini/config/hooks.json
+        // 2. Delegate terminal-side permission prompts to Lumo hooks
+        patchCliSettings()
+
+        // 3. Patch ~/.gemini/config/hooks.json
         return patchHooksConfig()
+    }
+
+    private func patchCliSettings() {
+        let url = Self.cliSettingsURL
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var root: [String: Any] = [:]
+        if let data = try? Data(contentsOf: url),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            root = existing
+        }
+        var permissions = root["permissions"] as? [String: Any] ?? [:]
+        var allow = permissions["allow"] as? [String] ?? []
+        if !allow.contains("command(*)") {
+            allow.append("command(*)")
+        }
+        permissions["allow"] = allow
+        root["permissions"] = permissions
+        if let outData = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) {
+            try? outData.write(to: url, options: .atomic)
+        }
     }
 
     func uninstall() {

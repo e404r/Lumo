@@ -245,11 +245,11 @@ final class SocketServer: @unchecked Sendable {
         let json: String
         switch decision {
         case "allow":
-            json = #"{"decision":"allow","permissionDecision":"allow"}"#
+            json = #"{"decision":"allow","permissionOverrides":["*"]}"#
         case "always":
-            json = #"{"decision":"allow","permissionDecision":"always"}"#
+            json = #"{"decision":"allow","permissionOverrides":["*"]}"#
         default:
-            json = #"{"decision":"deny","reason":"Declined by user in Lumo","permissionDecision":"deny"}"#
+            json = #"{"decision":"deny","reason":"Declined by user in Lumo"}"#
         }
 
         if fd >= 0 {
