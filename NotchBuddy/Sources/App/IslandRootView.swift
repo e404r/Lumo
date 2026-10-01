@@ -401,6 +401,11 @@ struct CountdownBar: View {
         let window = min(10.0, autoClose * 0.6)
         let elapsed = Date.now.timeIntervalSince(state.lastActivity)
         let remaining = autoClose - elapsed
+        if remaining <= 0 {
+            barWidth = 0
+            NotificationCenter.default.post(name: .islandCollapse, object: nil)
+            return
+        }
         if remaining < window {
             barWidth = max(0, CGFloat(remaining / window) * 160)
         } else {
@@ -476,6 +481,7 @@ struct IslandHeader: View {
             // Right: action icons
             HStack(spacing: 14) {
                 Button(action: {
+                    state.lastActivity = .now
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         state.view = .settings
                     }
@@ -486,7 +492,10 @@ struct IslandHeader: View {
                 }
                 .buttonStyle(.plain)
 
-                Button(action: { state.soundEnabled.toggle() }) {
+                Button(action: {
+                    state.lastActivity = .now
+                    state.soundEnabled.toggle()
+                }) {
                     Image(systemName: state.soundEnabled ? "speaker.wave.2" : "speaker.slash")
                         .font(.system(size: 14))
                         .foregroundColor(Color(hex: "#8E939C"))
@@ -497,6 +506,7 @@ struct IslandHeader: View {
         }
         .frame(maxHeight: .infinity)
     }
+
 }
 
 struct TabButton: View {
@@ -514,6 +524,7 @@ struct TabButton: View {
     var body: some View {
         Button(action: {
             preAction?()
+            state.lastActivity = .now
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 state.view = view
             }

@@ -227,6 +227,9 @@ final class IslandWindowController: NSWindowController {
         let cur = AppState.shared.mousePosition
         if abs(newPos.x - cur.x) > 1 || abs(newPos.y - cur.y) > 1 {
             AppState.shared.mousePosition = newPos
+            if inIsland {
+                AppState.shared.lastActivity = .now
+            }
         }
 
         // Feed FSM hover enter/leave
@@ -448,6 +451,17 @@ final class IslandWindowController: NSWindowController {
         }
         NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
             finishDrag()
+        }
+
+        // Click outside expanded island collapses it immediately
+        NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                guard self.state.mode == .expanded, !self.state.isPinned else { return }
+                if !self.wasInIsland {
+                    self.collapse()
+                }
+            }
         }
 
         // Global hotkey to show island
