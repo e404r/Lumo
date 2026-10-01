@@ -4,12 +4,11 @@ import AppKit
 
 struct SettingsView: View {
     @ObservedObject private var state = AppState.shared
-    @State private var apiKey: String = KeychainStore.shared.get("anthropic-api-key") ?? ""
+    @State private var geminiApiKey: String = KeychainStore.shared.get("gemini-api-key") ?? KeychainStore.shared.get("anthropic-api-key") ?? ""
+    @State private var geminiModel: String = KeychainStore.shared.get("gemini-model") ?? "gemini-2.5-flash"
     @State private var launchAtStartup: Bool = (SMAppService.mainApp.status == .enabled)
     @State private var statusMessage: String = ""
-    @State private var showDiff: Bool = false
-    @State private var pendingHookJSON: String = ""
-    @State private var hookNeedsUpdate: Bool = HookServer.hooksNeedUpdate()
+    @State private var hooksInstalled: Bool = HookServer.shared.isHooksConfigured
 
     // Integration keys
     @State private var resendKey: String    = KeychainStore.shared.get("resend-api-key")  ?? ""
@@ -46,78 +45,61 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
 
-                // MARK: API
-                GroupBox("Anthropic API") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SecureField("API key (sk-ant-…)", text: $apiKey)
+                // MARK: Google Gemini API
+                GroupBox("Google Gemini API") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Powers direct notch chat and pair-programming assistance.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+
+                        SecureField("Gemini API key (AIzaSy…)", text: $geminiApiKey)
                             .textFieldStyle(.roundedBorder)
-                        Button("Save") {
-                            KeychainStore.shared.set("anthropic-api-key", value: apiKey)
-                            statusMessage = "✓ Key saved."
+
+                        Picker("Model", selection: $geminiModel) {
+                            Text("Gemini 2.5 Flash (Fast)").tag("gemini-2.5-flash")
+                            Text("Gemini 2.5 Pro (Deep reasoning)").tag("gemini-2.5-pro")
+                        }
+                        .pickerStyle(.segmented)
+
+                        Button("Save Gemini Settings") {
+                            KeychainStore.shared.set("gemini-api-key", value: geminiApiKey)
+                            KeychainStore.shared.set("gemini-model", value: geminiModel)
+                            statusMessage = "✓ Gemini settings saved to Keychain."
                         }
                         .buttonStyle(.borderedProminent)
                     }
                     .padding(6)
                 }
 
-                // MARK: Hooks
-                GroupBox("Claude Code Hooks") {
+                // MARK: Antigravity Hooks
+                GroupBox("Google Antigravity CLI Hooks") {
                     VStack(alignment: .leading, spacing: 10) {
-                        if hookNeedsUpdate {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.orange)
-                                Text("Hook timeout outdated — update to fix approvals")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.orange)
-                            }
-                            #if APPSTORE
-                            Button("Update hooks") { installHooksAppStore() }
-                            #else
-                            Button("Update hooks") { installHooks() }
-                            #endif
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(hooksInstalled ? Color.green : Color.red)
+                                .frame(width: 8, height: 8)
+                            Text(hooksInstalled ? "Antigravity Bridge is Active" : "Hooks Not Configured")
+                                .font(.system(size: 12, weight: .semibold))
                         }
-                        #if APPSTORE
-                        Text("~/.claude/coucou/nb-hook")
+
+                        Text("Hooks config: ~/.gemini/config/hooks.json")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.secondary)
-                        HStack(spacing: 10) {
-                            Button("Install hooks") { installHooksAppStore() }
-                                .buttonStyle(.borderedProminent)
-                            Button("Uninstall") { uninstallHooksAppStore() }
-                                .buttonStyle(.bordered)
-                        }
-                        #else
-                        Text("nb-hook : \(HookServer.hookScriptPath)")
+                        Text("Bridge relay: ~/.lumo/lumo_bridge.py")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.secondary)
+
                         HStack(spacing: 10) {
-                            Button("Install hooks") { installHooks() }
-                                .buttonStyle(.borderedProminent)
-                            Button("Uninstall") { uninstallHooks() }
-                                .buttonStyle(.bordered)
-                        }
-                        #endif
-
-                        #if !APPSTORE
-                        if showDiff {
-                            ScrollView {
-                                Text(pendingHookJSON)
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            Button("Install / Repair Hooks") {
+                                installHooks()
                             }
-                            .frame(height: 140)
-                            .background(Color(NSColor.textBackgroundColor))
-                            .cornerRadius(6)
+                            .buttonStyle(.borderedProminent)
 
-                            HStack {
-                                Button("Confirm & write") { confirmInstall() }
-                                    .buttonStyle(.borderedProminent)
-                                Button("Cancel") { showDiff = false; pendingHookJSON = "" }
-                                    .buttonStyle(.bordered)
+                            Button("Uninstall") {
+                                uninstallHooks()
                             }
+                            .buttonStyle(.bordered)
                         }
-                        #endif
                     }
                     .padding(6)
                 }
@@ -356,87 +338,16 @@ struct SettingsView: View {
 
     // MARK: - App Store: hooks via NSOpenPanel + security-scoped bookmark
 
-    #if APPSTORE
-    /// Opens NSOpenPanel to select ~/.claude, then writes hooks directly.
-    /// NSOpenPanel grants sandbox access immediately — no security-scoped bookmark needed.
-    private func pickClaudeFolder(prompt: String) -> URL? {
-        let panel = NSOpenPanel()
-        panel.message = "Select your .claude folder (press ⇧⌘. to show hidden files)"
-        panel.prompt = prompt
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.showsHiddenFiles = true
-        // getpwuid bypasses CFFIXED_USER_HOME and always returns the real user home
-        let realHomePath = getpwuid(getuid()).flatMap { String(cString: $0.pointee.pw_dir, encoding: .utf8) }
-            ?? "/Users/\(NSUserName())"
-        panel.directoryURL = URL(fileURLWithPath: realHomePath)
-        guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        guard url.lastPathComponent == ".claude" else {
-            statusMessage = "❌ Select the .claude folder (hidden, in your Home directory)."
-            return nil
-        }
-        return url
-    }
-
-    private func installHooksAppStore() {
-        guard let claudeURL = pickClaudeFolder(prompt: "Select") else { return }
-        let alert = NSAlert()
-        alert.messageText = "Install Coucou hooks in ~/.claude?"
-        alert.informativeText = "Will write:\n• ~/.claude/coucou/nb-hook\n• ~/.claude/settings.json (backup created first)"
-        alert.addButton(withTitle: "Install")
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .informational
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do {
-            try HookServer.shared.installAndWriteClaudeHooksAppStore(claudeURL: claudeURL)
-            hookNeedsUpdate = false
-            statusMessage = "✓ Hooks installed — restart VS Code to activate."
-        } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
-    }
-
-    private func uninstallHooksAppStore() {
-        guard let claudeURL = pickClaudeFolder(prompt: "Select") else { return }
-        do {
-            try HookServer.shared.uninstallClaudeHooksAppStore(claudeURL: claudeURL)
-            statusMessage = "✓ Hooks removed."
-        } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
-    }
-    #endif
-
     private func installHooks() {
-        do {
-            pendingHookJSON = try HookServer.shared.previewClaudeHooks()
-            showDiff = true
-            statusMessage = "Review the JSON below before confirming."
-        } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
-    }
-
-    private func confirmInstall() {
-        do {
-            try HookServer.shared.writeClaudeHooks()
-            showDiff = false
-            statusMessage = "✓ Hooks installed in ~/.claude/settings.json"
-            pendingHookJSON = ""
-            hookNeedsUpdate = false
-        } catch {
-            statusMessage = "❌ Write error: \(error.localizedDescription)"
-        }
+        HookServer.shared.installBridgeAndHooks()
+        hooksInstalled = HookServer.shared.isHooksConfigured
+        statusMessage = "✓ Antigravity hooks configured in ~/.gemini/config/hooks.json"
     }
 
     private func uninstallHooks() {
-        do {
-            try HookServer.shared.uninstallClaudeHooks()
-            statusMessage = "✓ Hooks removed."
-        } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
+        HookServer.shared.uninstallLumoHooks()
+        hooksInstalled = HookServer.shared.isHooksConfigured
+        statusMessage = "✓ Hooks removed."
     }
 
     private func saveIntegrations() {

@@ -58,6 +58,7 @@ struct AgentTask: Identifiable, Equatable {
 }
 
 enum AgentSource: Equatable {
+    case antigravity
     case claudeCode
     case n8n
 }

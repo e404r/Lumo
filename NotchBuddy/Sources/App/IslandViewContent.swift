@@ -59,7 +59,7 @@ struct OverviewView: View {
                                     .lineLimit(1)
                                     .truncationMode(.tail)
                                     .layoutPriority(1)
-                                Text(agent.source == .claudeCode ? "Claude Code" : "n8n")
+                                Text(agent.source == .antigravity ? "Antigravity" : (agent.source == .claudeCode ? "Claude Code" : "n8n"))
                                     .font(.system(size: 11))
                                     .foregroundColor(Color(hex: "#8E939C"))
                                     .lineLimit(1)
@@ -177,7 +177,7 @@ struct EmptyStateView: View {
                         .foregroundColor(Color(hex: "#9398A1"))
                 }
                 Spacer()
-                PrimaryButton("Ask Claude") {
+                PrimaryButton("Ask Gemini") {
                     state.view = .prompt
                 }
             }
@@ -229,7 +229,7 @@ struct QuestionView: View {
         ZStack {
             CardBackground(wash: .cyan)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "Claude Code is asking a question")
+                AgentWho(task: state.focusTask, label: "Antigravity is asking a question")
                 Text("Which search engine to use?")
                     .font(.system(size: 15, weight: .semibold))
                 HStack(spacing: 8) {
@@ -283,13 +283,16 @@ struct FinishedView: View {
         ZStack {
             CardBackground(wash: .green)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "Claude Code finished")
+                AgentWho(task: state.focusTask, label: "Antigravity finished")
                 Text(state.focusTask?.steps.last ?? "Session finished")
                     .font(.system(size: 15, weight: .semibold))
                 HStack(spacing: 8) {
                     #if !APPSTORE
                     PrimaryButton("Open terminal") {
-                        let terminalBundleIds = ["com.apple.Terminal", "com.googlecode.iterm2", "net.kovidgoyal.kitty", "com.mitchellh.ghostty"]
+                        let terminalBundleIds = [
+                            "com.apple.Terminal", "com.googlecode.iterm2", "net.kovidgoyal.kitty",
+                            "com.mitchellh.ghostty", "com.warp.WarpTerminal", "com.microsoft.VSCode"
+                        ]
                         let activated = terminalBundleIds.compactMap { id in
                             NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == id }
                         }.first.map { $0.activate(options: .activateIgnoringOtherApps) }
@@ -856,9 +859,9 @@ struct SearchingView: View {
 
     var label: String {
         switch state.promptContext {
-        case .window(_, let title, _): return "Claude is reading \(title)…"
-        case .file(let name, _): return "Claude is reading \(name)…"
-        case nil: return "Claude is searching…"
+        case .window(_, let title, _): return "Gemini is reading \(title)…"
+        case .file(let name, _): return "Gemini is reading \(name)…"
+        case nil: return "Gemini is searching…"
         }
     }
 
@@ -958,20 +961,7 @@ struct IntegrationCardView: View {
     private var isConfigured: Bool {
         switch task.id {
         case "integration_claude":
-            #if APPSTORE
-            // Sandboxed: can't read ~/.claude directly — check install flag set by HookServer
-            return UserDefaults.standard.bool(forKey: "coucouHooksInstalled")
-            #else
-            let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
-            guard let data = try? Data(contentsOf: url),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let hooks = json["hooks"] as? [String: Any],
-                  let ss = hooks["SessionStart"] as? [[String: Any]] else { return false }
-            return ss.contains { ($0["hooks"] as? [[String: Any]])?.contains {
-                let cmd = $0["command"] as? String
-                return cmd?.contains("NotchBuddy") == true || cmd?.contains("coucou") == true
-            } ?? false }
-            #endif
+            return HookServer.shared.isHooksConfigured
         case "integration_resend":  return KeychainStore.shared.get("resend-api-key") != nil
         case "integration_n8n":     return KeychainStore.shared.get("n8n-api-key")    != nil
         case "integration_vercel":  return KeychainStore.shared.get("vercel-token")   != nil
@@ -1083,7 +1073,7 @@ struct IntegrationCardView: View {
                         .foregroundColor(Color(hex: "#F5F6F8"))
                         .lineLimit(1).truncationMode(.tail)
                         .layoutPriority(1)
-                    Text("Claude Code")
+                    Text(task.id == "integration_claude" ? "Antigravity" : "Session")
                         .font(.system(size: 11))
                         .foregroundColor(Color(hex: "#8E939C"))
                         .lineLimit(1).truncationMode(.tail)
@@ -1114,7 +1104,7 @@ struct IntegrationCardView: View {
                     Circle()
                         .fill(Color(hex: task.color))
                         .frame(width: 7, height: 7)
-                    Text(task.id == "integration_claude" ? "VS Code" : task.name)
+                    Text(task.id == "integration_claude" ? "Antigravity" : task.name)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(hex: "#F5F6F8"))
                     Text("Integration")
@@ -2277,9 +2267,8 @@ struct AgentPill: View {
     let onTap: () -> Void
     @State private var isHovered = false
 
-    // VS Code pill always shows "VS Code" label regardless of active project name
     private var displayName: String {
-        task.id == "integration_claude" ? "VS Code" : task.name
+        task.id == "integration_claude" ? "Antigravity" : task.name
     }
 
     var body: some View {
@@ -2687,22 +2676,12 @@ struct SendButtonStyle: ButtonStyle {
 struct SettingsIslandView: View {
     @ObservedObject var state: AppState
 
-    private var claudeConnected: Bool {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
-        guard let data = try? Data(contentsOf: url),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let hooks = json["hooks"] as? [String: Any],
-              let ss = hooks["SessionStart"] as? [[String: Any]] else { return false }
-        return ss.contains { matcher in
-            (matcher["hooks"] as? [[String: Any]])?.contains {
-                ($0["command"] as? String)?.contains("NotchBuddy") == true
-            } ?? false
-        }
+    private var antigravityConnected: Bool {
+        HookServer.shared.isHooksConfigured
     }
 
     private var apiConnected: Bool {
-        KeychainStore.shared.get("anthropic-api-key") != nil
+        KeychainStore.shared.get("gemini-api-key") != nil || KeychainStore.shared.get("anthropic-api-key") != nil
     }
 
     var body: some View {
@@ -2751,8 +2730,8 @@ struct SettingsIslandView: View {
 
                 // Connection status
                 HStack(spacing: 14) {
-                    StatusBadge(label: "Claude Code", ok: claudeConnected)
-                    StatusBadge(label: "API", ok: apiConnected)
+                    StatusBadge(label: "Antigravity", ok: antigravityConnected)
+                    StatusBadge(label: "Gemini", ok: apiConnected)
                     Spacer()
                     Button("Settings…") {
                         NotificationCenter.default.post(name: .openFullSettings, object: nil)
