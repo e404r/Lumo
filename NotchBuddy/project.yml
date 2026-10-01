@@ -1,9 +1,9 @@
-name: NotchBuddy
+name: Lumo
 options:
-  bundleIdPrefix: fr.louisraille
+  bundleIdPrefix: com.lumo
   deploymentTarget:
     macOS: "15.0"
-  xcodeVersion: "27.0"
+  xcodeVersion: "26.0"
   createIntermediateGroups: true
 
 settings:
@@ -17,33 +17,22 @@ settings:
       CODE_SIGNING_REQUIRED: NO
       CODE_SIGNING_ALLOWED: NO
     Release:
-      CODE_SIGNING_REQUIRED: YES
+      CODE_SIGNING_REQUIRED: NO
       CODE_SIGNING_ALLOWED: YES
-      CODE_SIGN_IDENTITY: "Developer ID Application"
-      DEVELOPMENT_TEAM: 256AUJ9555
-      OTHER_CODE_SIGN_FLAGS: "--timestamp"
       CODE_SIGN_ENTITLEMENTS: Resources/Coucou.entitlements
 
 schemes:
-  NotchBuddy:
+  Lumo:
     build:
       targets:
-        NotchBuddy: all
-    run:
-      config: Debug
-    archive:
-      config: Release
-  CoucouAppStore:
-    build:
-      targets:
-        CoucouAppStore: all
+        Lumo: all
     run:
       config: Debug
     archive:
       config: Release
 
 targets:
-  NotchBuddy:
+  Lumo:
     type: application
     platform: macOS
     sources:
@@ -57,61 +46,22 @@ targets:
     info:
       path: Resources/Info.plist
       properties:
-        CFBundleName: Coucou
-        CFBundleDisplayName: Coucou
-        CFBundleIdentifier: fr.louisraille.NotchBuddy
-        CFBundleVersion: "2"
-        CFBundleShortVersionString: "0.1.1"
+        CFBundleName: Lumo
+        CFBundleDisplayName: Lumo
+        CFBundleIdentifier: com.lumo.Lumo
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0.0"
         CFBundlePackageType: APPL
         LSUIElement: YES
         NSHighResolutionCapable: YES
         NSSupportsAutomaticGraphicsSwitching: YES
-        NSAppleEventsUsageDescription: "Pour sauter au terminal et envoyer des mails."
-        NSAccessibilityUsageDescription: "Pour lire le titre de la fenêtre active et l'attacher comme contexte."
+        NSAppleEventsUsageDescription: "To jump to terminal and integrate with editor."
+        NSAccessibilityUsageDescription: "To read window titles and assist with context."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: fr.louisraille.NotchBuddy
-        PRODUCT_NAME: Coucou
+        PRODUCT_BUNDLE_IDENTIFIER: com.lumo.Lumo
+        PRODUCT_NAME: Lumo
         INFOPLIST_FILE: Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MACOSX_DEPLOYMENT_TARGET: "15.0"
         ENABLE_SANDBOX: NO
-
-  CoucouAppStore:
-    type: application
-    platform: macOS
-    sources:
-      - path: Sources
-        type: group
-      - path: Assets.xcassets
-        buildPhase: resources
-      - path: Resources/sounds
-        buildPhase: resources
-        type: folder
-    info:
-      path: Resources/InfoAppStore.plist
-      properties:
-        CFBundleName: Coucou
-        CFBundleDisplayName: Coucou
-        CFBundleIdentifier: fr.louisraille.Coucou
-        CFBundleVersion: "4"
-        CFBundleShortVersionString: "1.0"
-        CFBundlePackageType: APPL
-        LSUIElement: YES
-        NSHighResolutionCapable: YES
-        NSSupportsAutomaticGraphicsSwitching: YES
-        LSApplicationCategoryType: public.app-category.developer-tools
-        ITSAppUsesNonExemptEncryption: NO
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: fr.louisraille.Coucou
-        PRODUCT_NAME: Coucou
-        INFOPLIST_FILE: Resources/InfoAppStore.plist
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        MACOSX_DEPLOYMENT_TARGET: "15.0"
-        CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "Apple Development"
-        CODE_SIGN_ENTITLEMENTS: Resources/CoucouAppStore.entitlements
-        DEVELOPMENT_TEAM: 256AUJ9555
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: APPSTORE
-        CODE_SIGNING_ALLOWED: YES

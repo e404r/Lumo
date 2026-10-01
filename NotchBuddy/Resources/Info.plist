@@ -5,27 +5,27 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Coucou</string>
+	<string>Lumo</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
-	<string>fr.louisraille.NotchBuddy</string>
+	<string>com.lumo.Lumo</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Coucou</string>
+	<string>Lumo</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>Pour lire le titre de la fenêtre active et l'attacher comme contexte.</string>
+	<string>To read window titles and assist with context.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Pour sauter au terminal et envoyer des mails.</string>
+	<string>To jump to terminal and integrate with editor.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
