@@ -14,13 +14,13 @@
 		177E705704C40EA42371FF5C /* BotCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4CC01BDD274103B6E09C305 /* BotCanvasView.swift */; };
 		19AF0714BB15B4993FAA112F /* ResendPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E51531DC264684C6B0CC32 /* ResendPoller.swift */; };
 		33849AE36F5D57698AE0E439 /* StripePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB58EDC64F83600DBC3874D1 /* StripePoller.swift */; };
-		43B6E0A4F10C29A3F178C3F5 /* HookServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC2D9BD2C018E7CA6300D97 /* HookServer.swift */; };
+		5A7ABF4AFEAEAC7972E3D809 /* ProcessWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEF3CAC62B2EEC133CB1502 /* ProcessWatcher.swift */; };
 		62F0F6F58D60395880BE1EF3 /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334FBB6BAB8BDFF074CD7639 /* IslandTypes.swift */; };
 		72C789C5D7A26AB35194F6B6 /* LumoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C59C5CB08C476EC3773AB37 /* LumoApp.swift */; };
 		806526706251252D1581B6C1 /* UploadSequenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B76060C040C0E6F3D683F3A /* UploadSequenceEngine.swift */; };
 		80744C25DFC9398CC1CFB5BE /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D2AECBBE04DDF610D7502D /* ClaudeService.swift */; };
+		81055A8E34540A31C36FC754 /* SocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59A9FD7B7232A354150CFCCF /* SocketServer.swift */; };
 		82D0F99DD8C628FC34140585 /* BotEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC02BDA281E918A263CCA251 /* BotEngine.swift */; };
-		92750BAA95291ACACDBF0F89 /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F72DBC6955E5FC18861DD080 /* GeminiService.swift */; };
 		97AD52026DA292774DD469E5 /* N8nPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2A83841FBB7CE758FA1803 /* N8nPoller.swift */; };
 		99BF4308C9BB68A83D41990F /* CalcomPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = E625CEC7603DDF77FC0BA786 /* CalcomPoller.swift */; };
 		A7F7219A43B625930F0FD7A7 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68CBABED3FFBC7F3D52F707B /* AppState.swift */; };
@@ -28,6 +28,7 @@
 		B12AB36EC800B9706EC2DBDD /* NotionPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB710DCE39443927C839CDB /* NotionPoller.swift */; };
 		BB07747C7843F079CB38A06B /* IslandViewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA86E57189161EF50B7F8B6 /* IslandViewContent.swift */; };
 		CAE7AD5EAD10DA7C309DE9CF /* UploadCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDDF2D3FDE64DB3C964952D5 /* UploadCanvasView.swift */; };
+		E1F4A352A4B20327C743C285 /* AntigravityHookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = C264FF1831D6198F30ADFCDD /* AntigravityHookInstaller.swift */; };
 		E3D89EE90DD6007329A56B5C /* WindowContextCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5DF1011F8E6C195071334F /* WindowContextCapture.swift */; };
 		EBC1E4BFAFF8C2B621649613 /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFA071B86333C4EE4141AF5 /* IslandStateMachine.swift */; };
 		EBF0C8C544F30189233BF747 /* SoundEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72691EAD602042AFE68C0D2A /* SoundEngine.swift */; };
@@ -49,10 +50,10 @@
 		3C231750525E68951081E7E2 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		44C2174D2BC7F69D2F5F9884 /* FileDropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDropView.swift; sourceTree = "<group>"; };
 		4FF1F0777F19FD61A1F06A03 /* sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = sounds; path = Resources/sounds; sourceTree = SOURCE_ROOT; };
+		59A9FD7B7232A354150CFCCF /* SocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketServer.swift; sourceTree = "<group>"; };
 		5BA86E57189161EF50B7F8B6 /* IslandViewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandViewContent.swift; sourceTree = "<group>"; };
 		65E51531DC264684C6B0CC32 /* ResendPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResendPoller.swift; sourceTree = "<group>"; };
 		68CBABED3FFBC7F3D52F707B /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		6AC2D9BD2C018E7CA6300D97 /* HookServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookServer.swift; sourceTree = "<group>"; };
 		70D2AECBBE04DDF610D7502D /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
 		72691EAD602042AFE68C0D2A /* SoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEngine.swift; sourceTree = "<group>"; };
 		7771B244AAA0C5DB515FBB2C /* IslandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandRootView.swift; sourceTree = "<group>"; };
@@ -61,12 +62,13 @@
 		7D5DF1011F8E6C195071334F /* WindowContextCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowContextCapture.swift; sourceTree = "<group>"; };
 		87CEBF04F259EACC722E8E26 /* GreetingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GreetingCanvasView.swift; sourceTree = "<group>"; };
 		8905FD61F356E65482127550 /* IslandWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandWindowController.swift; sourceTree = "<group>"; };
+		8EEF3CAC62B2EEC133CB1502 /* ProcessWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessWatcher.swift; sourceTree = "<group>"; };
 		9E10F3292885B2BF0AA3DC06 /* VercelPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VercelPoller.swift; sourceTree = "<group>"; };
 		BFB623C3610E84612C6364CD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C264FF1831D6198F30ADFCDD /* AntigravityHookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityHookInstaller.swift; sourceTree = "<group>"; };
 		CDDF2D3FDE64DB3C964952D5 /* UploadCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadCanvasView.swift; sourceTree = "<group>"; };
 		E4CC01BDD274103B6E09C305 /* BotCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotCanvasView.swift; sourceTree = "<group>"; };
 		E625CEC7603DDF77FC0BA786 /* CalcomPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalcomPoller.swift; sourceTree = "<group>"; };
-		F72DBC6955E5FC18861DD080 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		FB58EDC64F83600DBC3874D1 /* StripePoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripePoller.swift; sourceTree = "<group>"; };
 		FC02BDA281E918A263CCA251 /* BotEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotEngine.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -101,6 +103,7 @@
 		8015F112A591663A50F3EFF7 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				C264FF1831D6198F30ADFCDD /* AntigravityHookInstaller.swift */,
 				783D79A9B787B4FB1FABA8DA /* AppDelegate.swift */,
 				68CBABED3FFBC7F3D52F707B /* AppState.swift */,
 				E4CC01BDD274103B6E09C305 /* BotCanvasView.swift */,
@@ -108,10 +111,8 @@
 				E625CEC7603DDF77FC0BA786 /* CalcomPoller.swift */,
 				70D2AECBBE04DDF610D7502D /* ClaudeService.swift */,
 				44C2174D2BC7F69D2F5F9884 /* FileDropView.swift */,
-				F72DBC6955E5FC18861DD080 /* GeminiService.swift */,
 				30DC142A6B9BDE7457216C09 /* GithubPoller.swift */,
 				87CEBF04F259EACC722E8E26 /* GreetingCanvasView.swift */,
-				6AC2D9BD2C018E7CA6300D97 /* HookServer.swift */,
 				7771B244AAA0C5DB515FBB2C /* IslandRootView.swift */,
 				1AFA071B86333C4EE4141AF5 /* IslandStateMachine.swift */,
 				334FBB6BAB8BDFF074CD7639 /* IslandTypes.swift */,
@@ -120,8 +121,10 @@
 				7C59C5CB08C476EC3773AB37 /* LumoApp.swift */,
 				1A2A83841FBB7CE758FA1803 /* N8nPoller.swift */,
 				1CB710DCE39443927C839CDB /* NotionPoller.swift */,
+				8EEF3CAC62B2EEC133CB1502 /* ProcessWatcher.swift */,
 				65E51531DC264684C6B0CC32 /* ResendPoller.swift */,
 				3C231750525E68951081E7E2 /* SettingsView.swift */,
+				59A9FD7B7232A354150CFCCF /* SocketServer.swift */,
 				72691EAD602042AFE68C0D2A /* SoundEngine.swift */,
 				FB58EDC64F83600DBC3874D1 /* StripePoller.swift */,
 				CDDF2D3FDE64DB3C964952D5 /* UploadCanvasView.swift */,
@@ -211,6 +214,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1F4A352A4B20327C743C285 /* AntigravityHookInstaller.swift in Sources */,
 				EE088E54573474D3E367E719 /* AppDelegate.swift in Sources */,
 				A7F7219A43B625930F0FD7A7 /* AppState.swift in Sources */,
 				177E705704C40EA42371FF5C /* BotCanvasView.swift in Sources */,
@@ -218,10 +222,8 @@
 				99BF4308C9BB68A83D41990F /* CalcomPoller.swift in Sources */,
 				80744C25DFC9398CC1CFB5BE /* ClaudeService.swift in Sources */,
 				F8FE272E12179E628CEA6AA3 /* FileDropView.swift in Sources */,
-				92750BAA95291ACACDBF0F89 /* GeminiService.swift in Sources */,
 				AC2479FB4031369FBBE4443A /* GithubPoller.swift in Sources */,
 				0632A2F1BFE8E478506B4D18 /* GreetingCanvasView.swift in Sources */,
-				43B6E0A4F10C29A3F178C3F5 /* HookServer.swift in Sources */,
 				0B58182FB33345C7258540A9 /* IslandRootView.swift in Sources */,
 				EBC1E4BFAFF8C2B621649613 /* IslandStateMachine.swift in Sources */,
 				62F0F6F58D60395880BE1EF3 /* IslandTypes.swift in Sources */,
@@ -230,8 +232,10 @@
 				72C789C5D7A26AB35194F6B6 /* LumoApp.swift in Sources */,
 				97AD52026DA292774DD469E5 /* N8nPoller.swift in Sources */,
 				B12AB36EC800B9706EC2DBDD /* NotionPoller.swift in Sources */,
+				5A7ABF4AFEAEAC7972E3D809 /* ProcessWatcher.swift in Sources */,
 				19AF0714BB15B4993FAA112F /* ResendPoller.swift in Sources */,
 				15BB3F7880FD94503CC73343 /* SettingsView.swift in Sources */,
+				81055A8E34540A31C36FC754 /* SocketServer.swift in Sources */,
 				EBF0C8C544F30189233BF747 /* SoundEngine.swift in Sources */,
 				33849AE36F5D57698AE0E439 /* StripePoller.swift in Sources */,
 				CAE7AD5EAD10DA7C309DE9CF /* UploadCanvasView.swift in Sources */,

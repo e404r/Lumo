@@ -4,8 +4,7 @@ import AppKit
 
 struct SettingsView: View {
     @ObservedObject private var state = AppState.shared
-    @State private var geminiApiKey: String = KeychainStore.shared.get("gemini-api-key") ?? KeychainStore.shared.get("anthropic-api-key") ?? ""
-    @State private var geminiModel: String = KeychainStore.shared.get("gemini-model") ?? "gemini-2.5-flash"
+    @ObservedObject private var watcher = ProcessWatcher.shared
     @State private var launchAtStartup: Bool = (SMAppService.mainApp.status == .enabled)
     @State private var statusMessage: String = ""
     @State private var hooksInstalled: Bool = HookServer.shared.isHooksConfigured
@@ -45,49 +44,63 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
 
-                // MARK: Google Gemini API
-                GroupBox("Google Gemini API") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Powers direct notch chat and pair-programming assistance.")
-                            .font(.system(size: 11))
+                // MARK: Google Antigravity CLI Integration
+                GroupBox("Google Antigravity CLI Integration") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Lumo operates as a native HUD companion for your terminal `agy` session, powered by Google One AI Premium (Ultra). No API keys or external credits required.")
+                            .font(.system(size: 11.5))
                             .foregroundColor(.secondary)
 
-                        SecureField("Gemini API key (AIzaSy…)", text: $geminiApiKey)
-                            .textFieldStyle(.roundedBorder)
+                        Divider()
 
-                        Picker("Model", selection: $geminiModel) {
-                            Text("Gemini 2.5 Flash (Fast)").tag("gemini-2.5-flash")
-                            Text("Gemini 2.5 Pro (Deep reasoning)").tag("gemini-2.5-pro")
-                        }
-                        .pickerStyle(.segmented)
-
-                        Button("Save Gemini Settings") {
-                            KeychainStore.shared.set("gemini-api-key", value: geminiApiKey)
-                            KeychainStore.shared.set("gemini-model", value: geminiModel)
-                            statusMessage = "✓ Gemini settings saved to Keychain."
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding(6)
-                }
-
-                // MARK: Antigravity Hooks
-                GroupBox("Google Antigravity CLI Hooks") {
-                    VStack(alignment: .leading, spacing: 10) {
+                        // Process Status
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(hooksInstalled ? Color.green : Color.red)
+                                .fill(watcher.isAgyRunning ? Color.green : Color.secondary.opacity(0.5))
                                 .frame(width: 8, height: 8)
-                            Text(hooksInstalled ? "Antigravity Bridge is Active" : "Hooks Not Configured")
-                                .font(.system(size: 12, weight: .semibold))
+                            Text(watcher.isAgyRunning ? "Terminal Process: Running (Active `agy` detected)" : "Terminal Process: Idle (Waiting for `agy` in terminal)")
+                                .font(.system(size: 12, weight: .medium))
                         }
 
-                        Text("Hooks config: ~/.gemini/config/hooks.json")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(.secondary)
-                        Text("Bridge relay: ~/.lumo/lumo_bridge.py")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(.secondary)
+                        // Socket Status
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                            Text("IPC Unix Socket: ~/.lumo/lumo.sock (Ready)")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+
+                        // Hooks Status
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(hooksInstalled ? Color.green : Color.orange)
+                                .frame(width: 8, height: 8)
+                            Text(hooksInstalled ? "Hooks Configured: ~/.gemini/config/hooks.json" : "Hooks Not Installed")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(hooksInstalled ? .secondary : .orange)
+                        }
+
+                        // Supported Features List
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Active Capabilities:")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text("• PreToolUse: Interactive Allow / Deny approval in Notch")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(.secondary)
+                            Text("• PostToolUse: Live step & command execution ticker")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(.secondary)
+                            Text("• PreInvocation: Notch thinking pulse animation")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(.secondary)
+                            Text("• Stop: Haptic sound and task completion card")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
 
                         HStack(spacing: 10) {
                             Button("Install / Repair Hooks") {
@@ -95,13 +108,20 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.borderedProminent)
 
-                            Button("Uninstall") {
+                            Button("Uninstall Hooks") {
                                 uninstallHooks()
+                            }
+                            .buttonStyle(.bordered)
+
+                            Spacer()
+
+                            Button("Open Terminal") {
+                                openTerminal()
                             }
                             .buttonStyle(.bordered)
                         }
                     }
-                    .padding(6)
+                    .padding(8)
                 }
 
                 // MARK: Integrations
@@ -348,6 +368,19 @@ struct SettingsView: View {
         HookServer.shared.uninstallLumoHooks()
         hooksInstalled = HookServer.shared.isHooksConfigured
         statusMessage = "✓ Hooks removed."
+    }
+
+    private func openTerminal() {
+        let terminalBundleIds = [
+            "com.apple.Terminal", "com.googlecode.iterm2", "net.kovidgoyal.kitty",
+            "com.mitchellh.ghostty", "com.warp.WarpTerminal", "com.microsoft.VSCode"
+        ]
+        let activated = terminalBundleIds.compactMap { id in
+            NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == id }
+        }.first.map { $0.activate(options: .activateIgnoringOtherApps) }
+        if activated == nil {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+        }
     }
 
     private func saveIntegrations() {

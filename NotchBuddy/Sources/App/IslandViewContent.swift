@@ -2680,8 +2680,8 @@ struct SettingsIslandView: View {
         HookServer.shared.isHooksConfigured
     }
 
-    private var apiConnected: Bool {
-        KeychainStore.shared.get("gemini-api-key") != nil || KeychainStore.shared.get("anthropic-api-key") != nil
+    private var cliConnected: Bool {
+        ProcessWatcher.shared.isAgyRunning
     }
 
     var body: some View {
@@ -2730,8 +2730,8 @@ struct SettingsIslandView: View {
 
                 // Connection status
                 HStack(spacing: 14) {
-                    StatusBadge(label: "Antigravity", ok: antigravityConnected)
-                    StatusBadge(label: "Gemini", ok: apiConnected)
+                    StatusBadge(label: "Hooks", ok: antigravityConnected)
+                    StatusBadge(label: "agy CLI", ok: cliConnected)
                     Spacer()
                     Button("Settings…") {
                         NotificationCenter.default.post(name: .openFullSettings, object: nil)

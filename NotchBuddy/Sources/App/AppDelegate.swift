@@ -64,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         islandController?.showWindow(nil)
         islandController?.fsm.launch()
         HookServer.shared.start()
+        ProcessWatcher.shared.start()
         N8nPoller.shared.start()
         VercelPoller.shared.start()
         ResendPoller.shared.start()

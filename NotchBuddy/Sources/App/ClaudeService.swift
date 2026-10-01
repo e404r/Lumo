@@ -57,8 +57,6 @@ final class KeychainStore: @unchecked Sendable {
     private let lock = NSLock()
 
     private static let allKeys = [
-        "gemini-api-key", "gemini-model",
-        "anthropic-api-key",
         "resend-api-key", "resend-from",
         "n8n-url", "n8n-api-key",
         "vercel-token",
@@ -93,21 +91,24 @@ final class KeychainStore: @unchecked Sendable {
     }
 }
 
-// MARK: - Claude API (Forwarded to native GeminiService)
+// MARK: - CLI Companion Service
+// Lumo operates as a passive and interactive HUD for the Antigravity CLI (`agy`).
+// Model inference is executed natively in your terminal via your Google One AI Premium (Ultra) subscription.
 
 @MainActor
 final class ClaudeService {
     static let shared = ClaudeService()
 
-    var apiKey: String? {
-        KeychainStore.shared.get("gemini-api-key") ?? KeychainStore.shared.get("anthropic-api-key")
-    }
+    var apiKey: String? { nil }
 
     func clearConversation() {
-        GeminiService.shared.clearConversation()
+        AppState.shared.chatHistory.removeAll()
     }
 
     func chat(query: String, context: PromptContext?, state: AppState) async {
-        await GeminiService.shared.chat(query: query, context: context, state: state)
+        state.stateOverride = nil
+        let response = "Lumo is connected to your Antigravity CLI as an interactive HUD. Run `agy` in your terminal to chat and execute tools with your Gemini Ultra subscription."
+        state.chatHistory.append(ChatMessage(role: .assistant, content: response))
     }
 }
+

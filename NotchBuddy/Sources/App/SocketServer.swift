@@ -2,163 +2,55 @@ import Foundation
 import Darwin
 import AppKit
 
-// MARK: - HookServer (Lumo Edition for Google Antigravity CLI)
-// Listens on a Unix domain socket (~/.lumo/lumo.sock) for lifecycle events from lumo_bridge.py.
-// Thread-safe: socket I/O on background threads, state updates dispatched to main actor.
+// MARK: - SocketServer (Lumo Unix Domain Socket Server for agy)
+// Listens on ~/.lumo/lumo.sock for IPC from lumo_bridge.py.
+// Thread-safe socket I/O on background threads; state updates dispatched to @MainActor.
 
-final class HookServer: @unchecked Sendable {
-    static let shared = HookServer()
+typealias HookServer = SocketServer
 
-    // Support directory: ~/.lumo
-    static var supportDir: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".lumo")
-    }
-
-    // Unix domain socket: ~/.lumo/lumo.sock
-    static var socketPath: String {
-        supportDir.appendingPathComponent("lumo.sock").path
-    }
-
-    // Python bridge hook script: ~/.lumo/lumo_bridge.py
-    static var bridgeScriptPath: String {
-        supportDir.appendingPathComponent("lumo_bridge.py").path
-    }
-
-    // Antigravity global hooks configuration: ~/.gemini/config/hooks.json
-    static var geminiHooksConfigURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".gemini/config/hooks.json")
-    }
+final class SocketServer: @unchecked Sendable {
+    static let shared = SocketServer()
 
     private var serverFD: Int32 = -1
     private var pendingApprovalFD: Int32 = -1
-    private var activeConversationId: String? = nil
+    private(set) var hasActiveSession: Bool = false
+    private var lastEventTime: Date = .distantPast
+    static var supportDir: URL {
+        AntigravityHookInstaller.lumoDir
+    }
 
     private init() {}
 
     // MARK: - Lifecycle
 
     func start() {
-        try? FileManager.default.createDirectory(at: Self.supportDir, withIntermediateDirectories: true)
-        installBridgeAndHooks()
-        Thread.detachNewThread { self.serverThread() }
+        // Ensure bridge and hooks are installed on startup
+        AntigravityHookInstaller.shared.install()
+
+        Thread.detachNewThread { [weak self] in
+            self?.serverThread()
+        }
     }
 
-    // MARK: - Auto-Configuration for Antigravity
-
+    // Convenience hook installer proxy
     var isHooksConfigured: Bool {
-        guard let data = try? Data(contentsOf: Self.geminiHooksConfigURL),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              json["lumo"] != nil else {
-            return false
-        }
-        return true
+        AntigravityHookInstaller.shared.isInstalled
     }
 
     func installBridgeAndHooks() {
-        let dir = Self.supportDir
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-
-        // 1. Write the Python bridge script
-        let bridgeURL = URL(fileURLWithPath: Self.bridgeScriptPath)
-        try? lumoBridgePythonScript.write(to: bridgeURL, atomically: true, encoding: .utf8)
-        _ = try? FileManager.default.setAttributes([.posixPermissions: 0o755 as NSNumber], ofItemAtPath: bridgeURL.path)
-
-        // 2. Patch ~/.gemini/config/hooks.json
-        patchGeminiHooksConfig()
-    }
-
-    func patchGeminiHooksConfig() {
-        let configURL = Self.geminiHooksConfigURL
-        let configDir = configURL.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
-
-        var root: [String: Any] = [:]
-        if let data = try? Data(contentsOf: configURL),
-           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            root = existing
-        }
-
-        let pythonCommand = "/usr/bin/python3 \"\(Self.bridgeScriptPath)\""
-
-        let lumoHookGroup: [String: Any] = [
-            "enabled": true,
-            "PreToolUse": [
-                [
-                    "matcher": "*",
-                    "hooks": [
-                        [
-                            "type": "command",
-                            "command": "\(pythonCommand) PreToolUse",
-                            "timeout": 120
-                        ]
-                    ]
-                ]
-            ],
-            "PostToolUse": [
-                [
-                    "matcher": "*",
-                    "hooks": [
-                        [
-                            "type": "command",
-                            "command": "\(pythonCommand) PostToolUse",
-                            "timeout": 15
-                        ]
-                    ]
-                ]
-            ],
-            "PreInvocation": [
-                [
-                    "type": "command",
-                    "command": "\(pythonCommand) PreInvocation",
-                    "timeout": 15
-                ]
-            ],
-            "PostInvocation": [
-                [
-                    "type": "command",
-                    "command": "\(pythonCommand) PostInvocation",
-                    "timeout": 15
-                ]
-            ],
-            "Stop": [
-                [
-                    "type": "command",
-                    "command": "\(pythonCommand) Stop",
-                    "timeout": 15
-                ]
-            ]
-        ]
-
-        root["lumo"] = lumoHookGroup
-
-        if let outData = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) {
-            try? outData.write(to: configURL, options: .atomic)
-            lumoLog("Successfully installed Antigravity hooks in \(configURL.path)")
-        }
+        AntigravityHookInstaller.shared.install()
     }
 
     func uninstallLumoHooks() {
-        let configURL = Self.geminiHooksConfigURL
-        guard let data = try? Data(contentsOf: configURL),
-              var root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
-
-        root.removeValue(forKey: "lumo")
-        if let outData = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) {
-            try? outData.write(to: configURL, options: .atomic)
-            lumoLog("Uninstalled Lumo hooks from \(configURL.path)")
-        }
+        AntigravityHookInstaller.shared.uninstall()
     }
 
     // MARK: - Socket Server (Background Thread)
 
     private func serverThread() {
-        let path = Self.socketPath
+        let path = AntigravityHookInstaller.socketPath
         let maxSunPathBytes = MemoryLayout<sockaddr_un>.size - MemoryLayout<sa_family_t>.size - 1
-        guard path.utf8.count <= maxSunPathBytes else {
-            lumoLog("Socket path too long: \(path)")
-            return
-        }
+        guard path.utf8.count <= maxSunPathBytes else { return }
 
         try? FileManager.default.removeItem(atPath: path)
 
@@ -179,12 +71,14 @@ final class HookServer: @unchecked Sendable {
         guard bindRC == 0 else { close(fd); return }
         guard Darwin.listen(fd, 10) == 0 else { close(fd); return }
 
-        lumoLog("Lumo socket listening at \(path)")
-
         while true {
             let clientFD = Darwin.accept(fd, nil, nil)
             guard clientFD >= 0 else { break }
-            Thread.detachNewThread { self.handleClient(fd: clientFD) }
+            self.hasActiveSession = true
+            self.lastEventTime = Date()
+            Thread.detachNewThread { [weak self] in
+                self?.handleClient(fd: clientFD)
+            }
         }
     }
 
@@ -212,7 +106,6 @@ final class HookServer: @unchecked Sendable {
         let eventName = payload["hook_event_name"] as? String ?? ""
 
         if eventName == "PreToolUse" {
-            // Check if tool execution needs interactive user permission
             Task { @MainActor in
                 self.processPreToolUse(fd: fd, payload: payload)
             }
@@ -225,19 +118,15 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
-    // MARK: - Event Processing (Main Actor)
+    // MARK: - Event Handlers (@MainActor)
 
     @MainActor
     private func processGenericEvent(name: String, payload: [String: Any]) {
         let state = AppState.shared
-        let conversationId = payload["conversationId"] as? String ?? "session"
-        activeConversationId = conversationId
-
         let workspacePaths = payload["workspacePaths"] as? [String] ?? []
         let cwd = payload["cwd"] as? String ?? workspacePaths.first ?? ""
         let rawName = URL(fileURLWithPath: cwd).lastPathComponent
         let projectName = rawName.isEmpty ? "Antigravity" : rawName
-
         upsertTask(projectName: projectName, cwd: cwd)
 
         let focused = state.focusId == "integration_claude"
@@ -280,8 +169,6 @@ final class HookServer: @unchecked Sendable {
     private func processPreToolUse(fd: Int32, payload: [String: Any]) {
         let state = AppState.shared
         let conversationId = payload["conversationId"] as? String ?? "session"
-        activeConversationId = conversationId
-
         let workspacePaths = payload["workspacePaths"] as? [String] ?? []
         let cwd = payload["cwd"] as? String ?? workspacePaths.first ?? ""
         let rawName = URL(fileURLWithPath: cwd).lastPathComponent
@@ -292,12 +179,10 @@ final class HookServer: @unchecked Sendable {
         let toolName = toolCall["name"] as? String ?? "Tool"
         let args = toolCall["args"] as? [String: Any] ?? [:]
 
-        let stepText = formatAntigravityStep(tool: toolName, args: args)
+        let stepText = formatToolStep(tool: toolName, args: args)
         appendStep(id: "integration_claude", step: stepText)
-        lumoLog("PreToolUse: \(toolName) -> \(stepText)")
 
-        // Identify tools requiring user approval
-        let requiresApproval = isToolSensitive(toolName: toolName, args: args)
+        let requiresApproval = isActionSensitive(toolName: toolName, args: args)
 
         if requiresApproval {
             if pendingApprovalFD >= 0 {
@@ -324,14 +209,14 @@ final class HookServer: @unchecked Sendable {
             state.focusId = "integration_claude"
             expandIfNeeded(to: .approval)
 
-            // Auto-fallback timeout after 115s (allows Antigravity default flow)
+            // Fallback timeout after 115s: allow terminal to resume
             let captured = fd
             DispatchQueue.main.asyncAfter(deadline: .now() + 115) { [weak self] in
                 guard let self, self.pendingApprovalFD == captured else { return }
                 self.sendApprovalDecision("allow")
             }
         } else {
-            // Auto-approved safe read/inspection tool
+            // Auto-approved step
             state.updateTask(id: "integration_claude", state: .working)
             if state.isPresent && state.mode == .hidden {
                 expandIfNeeded(to: .overview)
@@ -343,23 +228,14 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
-    /// Evaluates if an Antigravity tool should prompt for user confirmation in Notch
-    private func isToolSensitive(toolName: String, args: [String: Any]) -> Bool {
+    private func isActionSensitive(toolName: String, args: [String: Any]) -> Bool {
         if toolName == "run_command" {
-            // Check for high-impact commands
-            if let cmd = (args["CommandLine"] as? String)?.lowercased() {
-                let destructive = ["rm -rf", "git push", "git reset", "drop table", "sudo", "chmod", "kill", "pkill"]
-                for pattern in destructive {
-                    if cmd.contains(pattern) { return true }
-                }
-            }
-            // By default, command executions can prompt for approval if configured
             return true
         }
         return false
     }
 
-    // MARK: - Approval Decision
+    // MARK: - Approval Decision Handling
 
     @MainActor
     func sendApprovalDecision(_ decision: String) {
@@ -391,7 +267,7 @@ final class HookServer: @unchecked Sendable {
         state.view = state.tasks.isEmpty ? .empty : .overview
     }
 
-    // MARK: - UI & Task Helpers
+    // MARK: - Helpers
 
     @MainActor
     private func expandIfNeeded(to view: IslandView) {
@@ -441,7 +317,7 @@ final class HookServer: @unchecked Sendable {
         state.tasks[idx].stepIndex = state.tasks[idx].steps.count - 1
     }
 
-    private func formatAntigravityStep(tool: String, args: [String: Any]) -> String {
+    private func formatToolStep(tool: String, args: [String: Any]) -> String {
         switch tool {
         case "run_command":
             if let cmd = args["CommandLine"] as? String {
@@ -496,8 +372,6 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
-    // MARK: - Networking / Sockets IO
-
     private func sendLine(fd: Int32, text: String) {
         let full = text.hasSuffix("\n") ? text : text + "\n"
         let bytes = Array(full.utf8)
@@ -510,113 +384,4 @@ final class HookServer: @unchecked Sendable {
             }
         }
     }
-
-    private func lumoLog(_ message: String) {
-        let logsDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Logs/Lumo")
-        try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
-        let logFile = logsDir.appendingPathComponent("lumo.log")
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let line = "\(formatter.string(from: Date())) \(message)\n"
-        guard let data = line.data(using: .utf8) else { return }
-        if FileManager.default.fileExists(atPath: logFile.path) {
-            if let handle = try? FileHandle(forWritingTo: logFile) {
-                handle.seekToEndOfFile()
-                handle.write(data)
-                try? handle.close()
-            }
-        } else {
-            try? data.write(to: logFile)
-        }
-    }
 }
-
-// MARK: - Notification Extension
-
-extension Notification.Name {
-    static let hookExpand = Notification.Name("lumo.hookExpand")
-}
-
-// MARK: - Embedded Python Bridge Script (lumo_bridge.py)
-// Executed by Antigravity CLI lifecycle hooks.
-// Connects to ~/.lumo/lumo.sock.
-// Instant fail-safe: if Lumo is not running, exits in <5ms with default allow without blocking.
-
-private let lumoBridgePythonScript = """
-#!/usr/bin/env python3
-import sys, json, os, socket
-
-def main():
-    event_name = sys.argv[1] if len(sys.argv) > 1 else ""
-    try:
-        raw = sys.stdin.buffer.read()
-        payload = json.loads(raw) if raw else {}
-    except Exception:
-        payload = {}
-
-    payload["hook_event_name"] = event_name
-
-    # Add environment metadata
-    env = os.environ
-    payload.setdefault("term_program", env.get("TERM_PROGRAM", ""))
-    payload.setdefault("cwd", os.getcwd())
-
-    socket_path = os.path.expanduser("~/.lumo/lumo.sock")
-
-    # Fast fail-safe: check socket existence
-    if not os.path.exists(socket_path):
-        fallback(event_name)
-        return
-
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(0.2)
-        s.connect(socket_path)
-    except Exception:
-        fallback(event_name)
-        return
-
-    try:
-        s.sendall((json.dumps(payload) + "\\n").encode("utf-8"))
-
-        if event_name == "PreToolUse":
-            # Wait for user decision from Lumo (up to 118s)
-            s.settimeout(118)
-            chunks = []
-            while True:
-                chunk = s.recv(4096)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                if b"\\n" in chunk:
-                    break
-            s.close()
-            raw_resp = b"".join(chunks).decode("utf-8").strip()
-            if raw_resp:
-                sys.stdout.write(raw_resp + "\\n")
-                sys.stdout.flush()
-                return
-            fallback(event_name)
-        else:
-            s.settimeout(1.0)
-            try:
-                s.recv(1024)
-            except Exception:
-                pass
-            s.close()
-            fallback(event_name)
-    except Exception:
-        fallback(event_name)
-
-def fallback(event_name):
-    if event_name == "PreToolUse":
-        sys.stdout.write(json.dumps({"decision": "allow"}) + "\\n")
-    else:
-        sys.stdout.write("{}\\n")
-    sys.stdout.flush()
-
-if __name__ == "__main__":
-    main()
-    sys.exit(0)
-"""
