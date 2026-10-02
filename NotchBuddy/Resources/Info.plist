@@ -26,6 +26,10 @@
 	<string>To read window titles and assist with context.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>To jump to terminal and integrate with editor.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Lumo uses your microphone for hands-free voice commands and dictation.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Lumo uses speech recognition to convert your voice into AI coding prompts.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>

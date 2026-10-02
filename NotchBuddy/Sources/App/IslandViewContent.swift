@@ -191,6 +191,7 @@ struct EmptyStateView: View {
 
 struct ApprovalView: View {
     @ObservedObject var state: AppState
+    @ObservedObject private var voiceManager = VoiceManager.shared
 
     var approval: ApprovalInfo? { state.pendingApproval }
 
@@ -198,27 +199,86 @@ struct ApprovalView: View {
         ZStack {
             CardBackground(wash: .amber)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "needs permission")
+                HStack {
+                    AgentWho(task: state.focusTask, label: "needs permission")
+                    Spacer()
+                    if voiceManager.isRecording {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 6, height: 6)
+                                .scaleEffect(1.0 + CGFloat(voiceManager.audioLevel) * 0.8)
+                            Text("Voice: Say 'Allow' or 'Deny'")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Color.secondary)
+                        }
+                    }
+                }
                 CodeBlock(text: approval?.command ?? approval?.tool ?? "…")
                 HStack(spacing: 8) {
                     SecondaryButton("Deny") {
+                        voiceManager.stopRecording()
                         HookServer.shared.sendApprovalDecision("deny")
                     }
                     PrimaryButton("Allow") {
+                        voiceManager.stopRecording()
                         HookServer.shared.sendApprovalDecision("allow")
                     }
                     SecondaryButton("Always") {
+                        voiceManager.stopRecording()
                         HookServer.shared.sendApprovalDecision("always")
                     }
+
+                    Button(action: toggleVoiceApproval) {
+                        Image(systemName: voiceManager.isRecording ? "waveform" : "mic.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(voiceManager.isRecording ? .red : Color(hex: "#8E939C"))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Toggle voice approval")
                 }
             }
             .padding(.leading, 116)
             .padding(.trailing, 16)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear {
+                if voiceManager.isAuthorized {
+                    startVoiceApproval()
+                }
+            }
+            .onDisappear {
+                voiceManager.stopRecording()
+            }
         }
     }
+
+    private func toggleVoiceApproval() {
+        if voiceManager.isRecording {
+            voiceManager.stopRecording()
+        } else {
+            startVoiceApproval()
+        }
+    }
+
+    private func startVoiceApproval() {
+        voiceManager.startRecording(onUpdate: { spoken in
+            let lower = spoken.lowercased()
+            if lower.contains("allow") || lower.contains("yes") || lower.contains("approve") || lower.contains("დაუშვი") || lower.contains("კი") {
+                self.voiceManager.stopRecording()
+                HookServer.shared.sendApprovalDecision("allow")
+            } else if lower.contains("deny") || lower.contains("no") || lower.contains("block") || lower.contains("უარყავი") || lower.contains("არა") {
+                self.voiceManager.stopRecording()
+                HookServer.shared.sendApprovalDecision("deny")
+            } else if lower.contains("always") || lower.contains("ყოველთვის") {
+                self.voiceManager.stopRecording()
+                HookServer.shared.sendApprovalDecision("always")
+            }
+        })
+    }
 }
+
 
 // MARK: - Question
 
@@ -715,6 +775,7 @@ struct MailView: View {
 
 struct PromptView: View {
     @ObservedObject var state: AppState
+    @ObservedObject private var voiceManager = VoiceManager.shared
     @State private var text: String = ""
     @FocusState private var focused: Bool
 
@@ -761,11 +822,29 @@ struct PromptView: View {
                 }
 
                 HStack(spacing: 8) {
-                    TextField(state.chatHistory.isEmpty ? "Ask me anything…" : "Continue…", text: $text)
+                    TextField(voiceManager.isRecording ? "Listening to your voice…" : (state.chatHistory.isEmpty ? "Ask me anything or use voice…" : "Continue…"), text: $text)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
                         .focused($focused)
                         .onSubmit { sendMessage() }
+
+                    // Voice Command Microphone Button
+                    Button(action: toggleVoice) {
+                        ZStack {
+                            if voiceManager.isRecording {
+                                Circle()
+                                    .fill(Color.red.opacity(0.3))
+                                    .scaleEffect(1.0 + CGFloat(voiceManager.audioLevel) * 0.9)
+                                    .frame(width: 22, height: 22)
+                            }
+                            Image(systemName: voiceManager.isRecording ? "waveform" : "mic.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(voiceManager.isRecording ? Color.red : Color(hex: "#8E939C"))
+                        }
+                        .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help(voiceManager.isRecording ? "Stop voice recording (auto-sends on silence)" : "Voice Command")
 
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up")
@@ -787,6 +866,28 @@ struct PromptView: View {
         }
         .padding(.bottom, 10)
         .onAppear { focused = true }
+        .onDisappear {
+            if voiceManager.isRecording {
+                voiceManager.stopRecording()
+            }
+        }
+    }
+
+    private func toggleVoice() {
+        if voiceManager.isRecording {
+            voiceManager.stopRecording()
+        } else {
+            focused = true
+            voiceManager.startRecording(
+                onUpdate: { partial in
+                    self.text = partial
+                },
+                onFinished: { finalResult in
+                    self.text = finalResult
+                    self.sendMessage()
+                }
+            )
+        }
     }
 
     private func sendMessage() {
@@ -802,6 +903,7 @@ struct PromptView: View {
         }
     }
 }
+
 
 
 struct ChatBubble: View {

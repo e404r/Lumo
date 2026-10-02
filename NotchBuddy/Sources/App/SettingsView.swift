@@ -5,6 +5,7 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject private var state = AppState.shared
     @ObservedObject private var watcher = ProcessWatcher.shared
+    @ObservedObject private var voiceManager = VoiceManager.shared
     @State private var launchAtStartup: Bool = (SMAppService.mainApp.status == .enabled)
     @State private var statusMessage: String = ""
     @State private var hooksInstalled: Bool = HookServer.shared.isHooksConfigured
@@ -119,6 +120,35 @@ struct SettingsView: View {
                                 openTerminal()
                             }
                             .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(8)
+                }
+
+                // MARK: Voice & Speech Commands
+                GroupBox("Voice Commands & Dictation") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(voiceManager.isAuthorized ? Color.green : Color.orange)
+                                .frame(width: 8, height: 8)
+                            Text(voiceManager.isAuthorized ? "Speech Recognition: Ready" : "Microphone & Speech: Requires Authorization")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+
+                        Text("Speak prompts hands-free in the Notch or say 'Allow' / 'Deny' on permission cards.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+
+                        Toggle("Read AI responses aloud (Text-to-Speech)", isOn: $voiceManager.ttsEnabled)
+                            .font(.system(size: 11.5))
+
+                        HStack {
+                            Button(voiceManager.isAuthorized ? "Permissions Granted" : "Authorize Microphone & Speech") {
+                                voiceManager.requestPermissions()
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(voiceManager.isAuthorized)
                         }
                     }
                     .padding(8)

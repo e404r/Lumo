@@ -57,6 +57,8 @@ targets:
         NSSupportsAutomaticGraphicsSwitching: YES
         NSAppleEventsUsageDescription: "To jump to terminal and integrate with editor."
         NSAccessibilityUsageDescription: "To read window titles and assist with context."
+        NSMicrophoneUsageDescription: "Lumo uses your microphone for hands-free voice commands and dictation."
+        NSSpeechRecognitionUsageDescription: "Lumo uses speech recognition to convert your voice into AI coding prompts."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.lumo.Lumo

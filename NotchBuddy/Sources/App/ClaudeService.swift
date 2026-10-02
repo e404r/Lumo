@@ -202,6 +202,7 @@ final class ClaudeService {
         state.stateOverride = nil
         state.chatHistory.append(ChatMessage(role: .assistant, content: result))
         SoundEngine.shared.play("finish")
+        VoiceManager.shared.speak(result)
     }
 }
 

@@ -17,6 +17,7 @@
 		5A7ABF4AFEAEAC7972E3D809 /* ProcessWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EEF3CAC62B2EEC133CB1502 /* ProcessWatcher.swift */; };
 		62F0F6F58D60395880BE1EF3 /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334FBB6BAB8BDFF074CD7639 /* IslandTypes.swift */; };
 		72C789C5D7A26AB35194F6B6 /* LumoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C59C5CB08C476EC3773AB37 /* LumoApp.swift */; };
+		7B286EE3AAED5F6E46FD09D1 /* VoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00650E43A0D878E1F39E5968 /* VoiceManager.swift */; };
 		806526706251252D1581B6C1 /* UploadSequenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B76060C040C0E6F3D683F3A /* UploadSequenceEngine.swift */; };
 		80744C25DFC9398CC1CFB5BE /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D2AECBBE04DDF610D7502D /* ClaudeService.swift */; };
 		81055A8E34540A31C36FC754 /* SocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59A9FD7B7232A354150CFCCF /* SocketServer.swift */; };
@@ -40,6 +41,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		00650E43A0D878E1F39E5968 /* VoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceManager.swift; sourceTree = "<group>"; };
 		1A2A83841FBB7CE758FA1803 /* N8nPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = N8nPoller.swift; sourceTree = "<group>"; };
 		1AFA071B86333C4EE4141AF5 /* IslandStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandStateMachine.swift; sourceTree = "<group>"; };
 		1B76060C040C0E6F3D683F3A /* UploadSequenceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadSequenceEngine.swift; sourceTree = "<group>"; };
@@ -130,6 +132,7 @@
 				CDDF2D3FDE64DB3C964952D5 /* UploadCanvasView.swift */,
 				1B76060C040C0E6F3D683F3A /* UploadSequenceEngine.swift */,
 				9E10F3292885B2BF0AA3DC06 /* VercelPoller.swift */,
+				00650E43A0D878E1F39E5968 /* VoiceManager.swift */,
 				7D5DF1011F8E6C195071334F /* WindowContextCapture.swift */,
 			);
 			path = App;
@@ -241,6 +244,7 @@
 				CAE7AD5EAD10DA7C309DE9CF /* UploadCanvasView.swift in Sources */,
 				806526706251252D1581B6C1 /* UploadSequenceEngine.swift in Sources */,
 				EF1E59A6DD58823646A3CF49 /* VercelPoller.swift in Sources */,
+				7B286EE3AAED5F6E46FD09D1 /* VoiceManager.swift in Sources */,
 				E3D89EE90DD6007329A56B5C /* WindowContextCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
