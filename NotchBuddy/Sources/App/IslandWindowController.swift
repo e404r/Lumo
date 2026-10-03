@@ -239,9 +239,25 @@ final class IslandWindowController: NSWindowController {
             if fsm.state == .coucou {
                 NotificationCenter.default.post(name: .greetingHover, object: nil)
             }
-            fsm.mouseEntered()
+            if state.mode == .compact || fsm.state == .petit {
+                // 1. Pop star head up
+                state.isPeekingUp = true
+                // 2. Trigger waving hello
+                NotificationCenter.default.post(name: .starWaveRequested, object: nil)
+                // 3. Staggered expansion after wave finishes (~0.32s)
+                scheduleHover(after: 0.32) { [weak self] in
+                    guard let self, self.wasInIsland, self.state.mode != .expanded else { return }
+                    self.fsm.click()
+                }
+            } else {
+                fsm.mouseEntered()
+            }
         }
         if !inIsland && wasInIsland {
+            hoverTimer?.cancel()
+            if state.mode == .compact {
+                state.isPeekingUp = false
+            }
             fsm.mouseLeft()
         }
         wasInIsland = inIsland
@@ -321,6 +337,10 @@ final class IslandWindowController: NSWindowController {
             ? .timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
             : .spring(response: 0.5, dampingFraction: 0.72)
         withAnimation(anim) { state.mode = mode }
+        if mode == .compact {
+            state.isPeekingUp = false
+            state.isStarWaving = false
+        }
         if mode == .expanded { SoundEngine.shared.play("open") }
         if prev == .expanded { SoundEngine.shared.play("close"); state.isPinned = false }
     }
@@ -443,7 +463,8 @@ final class IslandWindowController: NSWindowController {
                 } else {
                     self.attachDragStart = nil
                     if hadPendingClick && self.state.mode != .expanded {
-                        self.fsm.click()   // FSM petit→home; onTransition calls expand(to:)
+                        self.fsm.click()   // FSM petit→home
+                        self.expand(to: self.defaultView())
                     }
                 }
             }
@@ -745,16 +766,17 @@ final class IslandWindowController: NSWindowController {
         // Chat view resizes dynamically — must match IslandContainer.chatPromptHeight
         let islandH: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            let base: CGFloat = 240
+            let base: CGFloat = 260
             let perMsg: CGFloat = 40
-            islandH = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
+            islandH = min(340, base + CGFloat(s.chatHistory.count) * perMsg)
         } else {
             islandH = fixedH
         }
         let islandMinX = (panelW - islandW) / 2
         let (cx, cy, diameter, _) = botPosition(mode: s.mode, view: s.view,
                                                   islandW: islandW, islandH: islandH,
-                                                  uploadProgress: s.uploadProgress)
+                                                  uploadProgress: s.uploadProgress,
+                                                  isPeekingUp: s.isPeekingUp)
         let radius = (diameter / 0.6) / 2
         // botPosition cy is from island TOP; panel AppKit coords have y=0 at bottom
         // island top in AppKit coords = panelH (island glued to top of panel/screen)
@@ -808,9 +830,9 @@ final class IslandPanel: NSPanel {
                                       progress: s.uploadProgress, nw: nw, nh: nh)
         let h: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            let base: CGFloat = 240
+            let base: CGFloat = 260
             let perMsg: CGFloat = 40
-            h = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
+            h = min(340, base + CGFloat(s.chatHistory.count) * perMsg)
         } else {
             h = fixedH
         }
@@ -852,6 +874,7 @@ extension Notification.Name {
     static let openFullSettings = Notification.Name("notchBuddy.openFullSettings")
     static let hookReveal       = Notification.Name("notchBuddy.hookReveal")
     static let hookExpand       = Notification.Name("notchBuddy.hookExpand")
+    static let starWaveRequested = Notification.Name("notchBuddy.starWaveRequested")
     // Greeting ↔ IslandWindowController
     static let greetComplete    = Notification.Name("notchBuddy.greetComplete")
     static let greetingHover    = Notification.Name("notchBuddy.greetingHover")
@@ -866,7 +889,7 @@ func islandSize(mode: IslandMode, view: IslandView,
                 nh: CGFloat = IslandConst.notchHeight) -> (CGFloat, CGFloat) {
     switch mode {
     case .hidden:   return (nw, nh)
-    case .compact:  return (nw + 160, nh)
+    case .compact:  return (nw + 76, nh)
     case .expanded:
         let layout = IslandConst.viewLayouts[view]!
         return (IslandConst.expandedWidth, layout.height)

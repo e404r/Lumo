@@ -1,32 +1,44 @@
-# Contributing to Coucou
+# Contributing to Lumo
 
-Thanks for wanting to help Mochi grow up! 🫶
+Thanks for wanting to help Lumo and our Gemini companion grow! 💫
 
-## Getting started
+---
+
+## Getting Started
+
+1. Ensure you have **macOS 15.0+** and **Xcode 16+** installed.
+2. Clone the repository and navigate to the project directory:
 
 ```bash
-brew install xcodegen
-cd NotchBuddy && xcodegen && open NotchBuddy.xcodeproj
+cd NotchBuddy
+xcodebuild -project Lumo.xcodeproj -scheme Lumo -configuration Debug build
 ```
 
-Never edit `NotchBuddy.xcodeproj` by hand: change `project.yml` and run `xcodegen`.
+*(Optional: if you modify `project.yml`, run `xcodegen generate` to update the Xcode project).*
 
-## Good first contributions
+---
 
-- A new integration (a poller + a pill + a detail card). Look at `StripePoller.swift` for a compact example.
-- A new emote or sound for Mochi.
-- Bug fixes — please describe how to reproduce.
+## Areas for Contribution
 
-## Rules of the house
+- **Google Antigravity Lifecycle Enhancements**: Improving response times, richer tool visualizations, and deeper hook interactions.
+- **Gemini Capabilities**: Expanding multimodal context, code analysis features, and audio/voice interactions.
+- **MacBook Notch Animations**: Crafting silky 120Hz ProMotion animations and tactile haptics.
+- **Bug Fixes & Optimizations**: Keeping memory and CPU usage at zero when the island is hidden.
 
-- Swift 6, SwiftUI + AppKit, **no third-party dependencies** unless there's really no other way.
-- Secrets go in the Keychain, never on disk or in git.
-- No telemetry, no network calls except to services the user configured.
-- Never block Claude Code: if the app doesn't answer, the hook must exit right away.
-- Never write `~/.claude/settings.json` without a backup and the user's confirmation.
-- Keep it light: 0 % CPU when the island is hidden.
+---
 
-## Pull requests
+## Rules of the House
 
-- One topic per PR, with a short GIF or screenshot for anything visual.
-- Build must pass with no new warnings.
+- **Swift 6, SwiftUI + AppKit**: Clean, modern, native Swift. Zero heavy third-party dependencies unless strictly necessary.
+- **Privacy & Security First**: Zero telemetry. All IPC happens strictly through the local Unix domain socket (`~/.lumo/lumo.sock`).
+- **Never Block the CLI**: If Lumo is closed or busy, the hook bridge must immediately exit and allow terminal commands to proceed.
+- **Safe Hook Management**: Never alter `~/.gemini/config/hooks.json` destructively or without backing up existing configurations.
+- **Performance**: 0% CPU consumption when the island is hidden behind the notch.
+
+---
+
+## Pull Request Guidelines
+
+- Keep pull requests focused on a single feature or fix.
+- Include a quick GIF or screenshot for any UI / animation changes.
+- Ensure the project builds cleanly with `xcodebuild` with zero warnings.

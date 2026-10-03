@@ -16,13 +16,13 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate project
-        run: cd NotchBuddy && xcodegen
+        run: cd NotchBuddy && xcodegen generate
 
       - name: Build
         run: |
           xcodebuild \
-            -project NotchBuddy/NotchBuddy.xcodeproj \
-            -scheme NotchBuddy \
+            -project NotchBuddy/Lumo.xcodeproj \
+            -scheme Lumo \
             -configuration Release \
             build \
             CODE_SIGNING_ALLOWED=NO \

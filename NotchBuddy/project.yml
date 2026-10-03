@@ -19,7 +19,7 @@ settings:
     Release:
       CODE_SIGNING_REQUIRED: NO
       CODE_SIGNING_ALLOWED: YES
-      CODE_SIGN_ENTITLEMENTS: Resources/Coucou.entitlements
+      CODE_SIGN_ENTITLEMENTS: Resources/Lumo.entitlements
 
 schemes:
   Lumo:

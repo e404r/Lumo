@@ -58,7 +58,7 @@ final class AntigravityHookInstaller: Sendable {
         return patchHooksConfig()
     }
 
-    private func patchCliSettings() {
+    func addPermanentPermission(_ cmd: String) {
         let url = Self.cliSettingsURL
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         var root: [String: Any] = [:]
@@ -68,6 +68,10 @@ final class AntigravityHookInstaller: Sendable {
         }
         var permissions = root["permissions"] as? [String: Any] ?? [:]
         var allow = permissions["allow"] as? [String] ?? []
+        let entry = (cmd == "*" || cmd.isEmpty) ? "command(*)" : "command(\(cmd))"
+        if !allow.contains(entry) {
+            allow.append(entry)
+        }
         if !allow.contains("command(*)") {
             allow.append("command(*)")
         }
@@ -76,6 +80,10 @@ final class AntigravityHookInstaller: Sendable {
         if let outData = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) {
             try? outData.write(to: url, options: .atomic)
         }
+    }
+
+    private func patchCliSettings() {
+        addPermanentPermission("*")
     }
 
     func uninstall() {

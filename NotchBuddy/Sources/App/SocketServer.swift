@@ -129,35 +129,35 @@ final class SocketServer: @unchecked Sendable {
         let projectName = rawName.isEmpty ? "Antigravity" : rawName
         upsertTask(projectName: projectName, cwd: cwd)
 
-        let focused = state.focusId == "integration_claude"
+        let focused = state.focusId == "integration_gemini"
 
         switch name {
         case "PreInvocation":
-            state.updateTask(id: "integration_claude", state: .thinking)
-            appendStep(id: "integration_claude", step: "Gemini is thinking…")
+            state.updateTask(id: "integration_gemini", state: .thinking)
+            appendStep(id: "integration_gemini", step: "Gemini is thinking…")
             if state.isPresent { expandIfNeeded(to: .overview) }
 
         case "PostInvocation":
-            state.updateTask(id: "integration_claude", state: .working)
+            state.updateTask(id: "integration_gemini", state: .working)
 
         case "PostToolUse":
-            state.updateTask(id: "integration_claude", state: .working)
+            state.updateTask(id: "integration_gemini", state: .working)
             if let err = payload["error"] as? String, !err.isEmpty {
-                appendStep(id: "integration_claude", step: "⚠ \(err.prefix(40))")
+                appendStep(id: "integration_gemini", step: "⚠ \(err.prefix(40))")
             }
 
         case "Stop":
-            state.updateTask(id: "integration_claude", state: .finished)
-            appendStep(id: "integration_claude", step: "✓ Task completed")
+            state.updateTask(id: "integration_gemini", state: .finished)
+            appendStep(id: "integration_gemini", step: "✓ Task completed")
             SoundEngine.shared.play("finish")
             if focused {
                 expandIfNeeded(to: .finished)
             } else {
-                setPillBadge(id: "integration_claude", badge: .finished)
+                setPillBadge(id: "integration_gemini", badge: .finished)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.2) {
-                state.updateTask(id: "integration_claude", state: .idle)
-                self.clearPillBadge(id: "integration_claude")
+                state.updateTask(id: "integration_gemini", state: .idle)
+                self.clearPillBadge(id: "integration_gemini")
             }
 
         default:
@@ -180,7 +180,7 @@ final class SocketServer: @unchecked Sendable {
         let args = toolCall["args"] as? [String: Any] ?? [:]
 
         let stepText = formatToolStep(tool: toolName, args: args)
-        appendStep(id: "integration_claude", step: stepText)
+        appendStep(id: "integration_gemini", step: stepText)
 
         let requiresApproval = isActionSensitive(toolName: toolName, args: args)
 
@@ -201,12 +201,12 @@ final class SocketServer: @unchecked Sendable {
                 displayCommand = "\(toolName) \(URL(fileURLWithPath: file).lastPathComponent)"
             }
 
-            state.updateTask(id: "integration_claude", state: .approval)
+            state.updateTask(id: "integration_gemini", state: .approval)
             state.pendingApproval = ApprovalInfo(sessionId: conversationId, tool: toolName, command: displayCommand)
             state.isPinned = true
             SoundEngine.shared.play("approval")
 
-            state.focusId = "integration_claude"
+            state.focusId = "integration_gemini"
             expandIfNeeded(to: .approval)
 
             // Fallback timeout after 115s: allow terminal to resume
@@ -217,7 +217,7 @@ final class SocketServer: @unchecked Sendable {
             }
         } else {
             // Auto-approved step
-            state.updateTask(id: "integration_claude", state: .working)
+            state.updateTask(id: "integration_gemini", state: .working)
             if state.isPresent && state.mode == .hidden {
                 expandIfNeeded(to: .overview)
             }
@@ -229,9 +229,11 @@ final class SocketServer: @unchecked Sendable {
     }
 
     private func isActionSensitive(toolName: String, args: [String: Any]) -> Bool {
-        if toolName == "run_command" {
-            return true
-        }
+        // Antigravity IDE already shows its own interactive confirmation dialog.
+        // Having Lumo also intercept and display a blocking approval modal forces the user
+        // to approve twice for the exact same command.
+        // By returning false here, Lumo allows the hook immediately and displays the step in the HUD,
+        // leaving the approval interaction to Antigravity IDE without double-prompting.
         return false
     }
 
@@ -242,14 +244,28 @@ final class SocketServer: @unchecked Sendable {
         let fd = pendingApprovalFD
         pendingApprovalFD = -1
 
+        let state = AppState.shared
+        let pending = state.pendingApproval
+        let command = pending?.command ?? ""
+
         let json: String
         switch decision {
-        case "allow":
-            json = #"{"decision":"allow","permissionOverrides":["*"]}"#
-        case "always":
-            json = #"{"decision":"allow","permissionOverrides":["*"]}"#
+        case "allow", "always":
+            // Antigravity expects specific permission format: command(*), edit(*), write(*), read(*)
+            var overrides = ["command(*)", "edit(*)", "write(*)", "read(*)"]
+            if !command.isEmpty {
+                // Escape quotes for valid JSON
+                let escapedCmd = command.replacingOccurrences(of: "\"", with: "\\\"")
+                overrides.insert("command(\(escapedCmd))", at: 0)
+            }
+            let overridesArray = overrides.map { "\"\($0)\"" }.joined(separator: ", ")
+            json = "{\"decision\":\"allow\",\"permissionOverrides\":[\(overridesArray)]}"
+
+            if decision == "always" {
+                AntigravityHookInstaller.shared.addPermanentPermission(command.isEmpty ? "*" : command)
+            }
         default:
-            json = #"{"decision":"deny","reason":"Declined by user in Lumo"}"#
+            json = #"{"decision":"deny","reason":"Declined by user in Lumo Notch"}"#
         }
 
         if fd >= 0 {
@@ -259,11 +275,10 @@ final class SocketServer: @unchecked Sendable {
             }
         }
 
-        let state = AppState.shared
         state.pendingApproval = nil
         state.isPinned = false
-        state.updateTask(id: "integration_claude", state: .working)
-        clearPillBadge(id: "integration_claude")
+        state.updateTask(id: "integration_gemini", state: .working)
+        clearPillBadge(id: "integration_gemini")
         state.view = state.tasks.isEmpty ? .empty : .overview
     }
 
@@ -278,7 +293,7 @@ final class SocketServer: @unchecked Sendable {
         default: isAlert = false
         }
         if state.mode == .expanded {
-            if isAlert { state.view = view }
+            if isAlert && (view != .finished || state.view != .prompt) { state.view = view }
         } else if isAlert {
             NotificationCenter.default.post(name: .hookExpand, object: view)
         } else if state.mode == .hidden {
@@ -289,7 +304,7 @@ final class SocketServer: @unchecked Sendable {
     @MainActor
     private func upsertTask(projectName: String, cwd: String = "") {
         let state = AppState.shared
-        guard let idx = state.tasks.firstIndex(where: { $0.id == "integration_claude" }) else { return }
+        guard let idx = state.tasks.firstIndex(where: { $0.id == "integration_gemini" }) else { return }
         state.tasks[idx].name = projectName
         if !cwd.isEmpty { state.tasks[idx].sessionCwd = cwd }
     }

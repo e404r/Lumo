@@ -1,20 +1,45 @@
-# Build artefacts
+# Build artefacts & Xcode
+build/
 NotchBuddy/build/
+DerivedData/
+*.xcuserstate
+*.xcuserdata
+xcuserdata/
+NotchBuddy/Lumo.xcodeproj/project.xcworkspace/xcuserdata/
+NotchBuddy/Lumo.xcodeproj/xcuserdata/
 NotchBuddy/NotchBuddy.xcodeproj/project.xcworkspace/xcuserdata/
 NotchBuddy/NotchBuddy.xcodeproj/xcuserdata/
-*.xcuserstate
 
-# Xcode DerivedData (outside repo — listed for clarity)
-DerivedData/
+# Security & Secrets (NEVER push to GitHub)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.p8
+*.cer
+*.crt
+*.mobileprovision
+*.provisionprofile
 
-# macOS
+# Local runtime, sockets & logs
+.lumo/
+*.sock
+*.log
+
+# Personal AI & local tool configs
+.gemini/
+.antigravity/
+.claude/
+.agents/
+_prive/
+
+# macOS System Files
 .DS_Store
 .AppleDouble
 .LSOverride
-
-# iCloud stubs
+._*
+.Spotlight-V100
+.Trashes
 *.icloud
 
-# Local only (never published)
-.claude/
-_prive/

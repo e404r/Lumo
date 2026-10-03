@@ -68,11 +68,11 @@ final class ProcessWatcher: ObservableObject, @unchecked Sendable {
     @MainActor
     private func handleStateChange(isRunning: Bool) {
         let state = AppState.shared
-        guard let idx = state.tasks.firstIndex(where: { $0.id == "integration_claude" }) else { return }
+        guard let idx = state.tasks.firstIndex(where: { $0.id == "integration_gemini" }) else { return }
 
         if isRunning {
             if state.tasks[idx].state == .idle {
-                state.updateTask(id: "integration_claude", state: .thinking)
+                state.updateTask(id: "integration_gemini", state: .thinking)
             }
             if state.mode == .hidden && state.isPresent {
                 NotificationCenter.default.post(name: .hookReveal, object: nil)
@@ -80,7 +80,7 @@ final class ProcessWatcher: ObservableObject, @unchecked Sendable {
         } else {
             // When agy process exits
             if state.tasks[idx].state == .working || state.tasks[idx].state == .thinking {
-                state.updateTask(id: "integration_claude", state: .idle)
+                state.updateTask(id: "integration_gemini", state: .idle)
             }
         }
     }

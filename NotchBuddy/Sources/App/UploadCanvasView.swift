@@ -1,8 +1,10 @@
 import SwiftUI
 import AppKit
 
-// Full 640×176 canvas that drives the upload sequence animation.
-// Replaces the header + content area when the upload engine is active.
+// MARK: - Gemini Cosmic File Drop & Upload Canvas
+// Fully converted to Google Antigravity / Gemini Star design system.
+// Replaces the legacy Mochi character with the living Gemini Star,
+// celestial cosmic gradients, animated stardust particles, and Antigravity styling.
 
 struct UploadCanvasView: View {
     @ObservedObject var state: AppState
@@ -19,12 +21,12 @@ struct UploadCanvasView: View {
                 Canvas { ctx, _ in
                     drawScene(ctx: ctx, f: f, wallTime: wallTime)
                 }
-                .frame(width: 640, height: 176)
+                .frame(width: 640, height: 172)
 
-                // Interactive choose buttons (invisible hit areas at reference positions)
+                // Interactive choose buttons (overlayed over canvas at completion)
                 if f.chooseAlpha > 0 {
                     chooseOverlay(f: f)
-                        .frame(width: 640, height: 176)
+                        .frame(width: 640, height: 172)
                 }
             }
         }
@@ -34,10 +36,10 @@ struct UploadCanvasView: View {
         .onAppear {
             if let url = state.droppedFile?.url { loadIcon(url: url) }
         }
-        .frame(width: 640, height: 176)
+        .frame(width: 640, height: 172)
     }
 
-    // MARK: - File icon
+    // MARK: - File Icon Helper
 
     private func loadIcon(url: URL) {
         let img = NSWorkspace.shared.icon(forFile: url.path)
@@ -45,538 +47,543 @@ struct UploadCanvasView: View {
         fileIcon = img
     }
 
-    // MARK: - Choose overlay (transparent SwiftUI buttons over canvas)
+    // MARK: - Choose Overlay (Interactive Gemini Action Buttons)
 
     @ViewBuilder
     private func chooseOverlay(f: USFrame) -> some View {
-        // Reference positions: button1 x=100 w=176 y=113 h=26, button2 x=284 w=128
         ZStack(alignment: .topLeading) {
-            // Primary: "Ask a question about it"
+            // Primary Action: "Ask Gemini"
             Button {
-                withAnimation(.easeInOut(duration: 0.22)) { state.view = .prompt }
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    state.view = .prompt
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                     UploadSequenceEngine.shared.deactivate()
                 }
             } label: {
-                Color.clear
-                    .frame(width: 168, height: 26)
-                    .contentShape(Rectangle())
+                HStack(spacing: 6) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Ask Gemini")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(.white)
+                .frame(width: 148, height: 28)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "#2563EB"), Color(hex: "#4F46E5")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                .shadow(color: Color(hex: "#2563EB").opacity(0.4), radius: 8, x: 0, y: 2)
             }
             .buttonStyle(.plain)
-            .frame(width: 168, height: 26)
-            .position(x: 114 + 84, y: 113 + 13)   // center = (198, 126)
+            .position(x: 120 + 74, y: 114 + 14)
 
-            // Secondary: "Send by email"
+            // Secondary Action: "Done"
             Button {
-                withAnimation(.easeInOut(duration: 0.22)) { state.view = .mail }
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    state.view = .overview
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
                     UploadSequenceEngine.shared.deactivate()
                 }
             } label: {
-                Color.clear
-                    .frame(width: 120, height: 26)
-                    .contentShape(Rectangle())
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10.5, weight: .bold))
+                    Text("Done")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                }
+                .foregroundColor(Color(hex: "#E2E8F0"))
+                .frame(width: 86, height: 28)
+                .background(Color.white.opacity(0.08))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
             }
             .buttonStyle(.plain)
-            .frame(width: 120, height: 26)
-            .position(x: 290 + 60, y: 113 + 13)   // center = (350, 126)
+            .position(x: 280 + 43, y: 114 + 14)
         }
         .opacity(f.chooseAlpha)
         .allowsHitTesting(f.chooseAlpha > 0.5)
     }
 
-    // MARK: - Main draw
+    // MARK: - Scene Drawing
 
     private func drawScene(ctx: GraphicsContext, f: USFrame, wallTime: Double = 0) {
         var c = ctx
 
-        // ── Island background ──────────────────────────────────────
-        c.fill(Path(CGRect(x:0, y:0, width:640, height:176)), with: .color(Color.black))
+        // 1. Island Container Background (Obsidian Base)
+        c.fill(Path(CGRect(x: 0, y: 0, width: 640, height: 172)), with: .color(Color(hex: "#06070A")))
 
-        // ── Card ──────────────────────────────────────────────────
-        let cardPath = roundedRect(CGRect(x: USC.CARD_X, y: USC.CARD_Y, width: USC.CARD_W, height: USC.CARD_H), r: USC.CARD_R)
+        // 2. Card Boundary & Dimensions
+        let cardRect = CGRect(x: USC.CARD_X, y: USC.CARD_Y, width: USC.CARD_W, height: USC.CARD_H)
+        let cardPath = roundedRect(cardRect, r: USC.CARD_R)
 
         var cardCtx = c
         cardCtx.clip(to: cardPath)
-        cardCtx.fill(Path(CGRect(x: USC.CARD_X, y: USC.CARD_Y, width: USC.CARD_W, height: USC.CARD_H)),
-                     with: .color(Color(red:0.051, green:0.055, blue:0.063)))
 
-        // Green glow from card bottom — grows slowly with upload progress
-        if f.greenWash > 0 {
-            // Center at card bottom edge; gradient fans upward through the card
-            let gx = USC.CARD_X + USC.CARD_W/2
-            let gy = USC.CARD_Y + USC.CARD_H   // bottom of card
-            let gGrad = Gradient(stops: [
-                .init(color: Color(red:0.157,green:0.831,blue:0.510).opacity(f.greenWash * 0.90), location:0),
-                .init(color: Color(red:0.157,green:0.831,blue:0.510).opacity(f.greenWash * 0.30), location:0.55),
-                .init(color: Color(red:0.157,green:0.831,blue:0.510).opacity(0), location:1)
-            ])
-            cardCtx.fill(Path(CGRect(x:USC.CARD_X,y:USC.CARD_Y,width:USC.CARD_W,height:USC.CARD_H)),
-                         with: .radialGradient(gGrad, center:CGPoint(x:gx,y:gy),
-                                              startRadius:0, endRadius:USC.CARD_H*1.5))
-        }
+        // Card Dark Obsidian Glass Fill
+        cardCtx.fill(cardPath, with: .color(Color(hex: "#0E1017").opacity(0.96)))
 
-        // ── Dashed border (animates left→right while on drop zone) ────
+        // 3. Gemini Cosmic Radial Glow
+        let isHovered = f.zoneOver || state.fileDragOver
+        let glowCenter = CGPoint(x: USC.CARD_X + USC.CARD_W / 2, y: USC.CARD_Y + USC.CARD_H / 2)
+        let glowRadius = USC.CARD_W * 0.65
+        let cosmicGlow = Gradient(stops: [
+            .init(color: Color(hex: "#38BDF8").opacity(isHovered ? 0.22 : 0.08), location: 0),
+            .init(color: Color(hex: "#6366F1").opacity(isHovered ? 0.16 : 0.05), location: 0.45),
+            .init(color: Color(hex: "#A855F7").opacity(isHovered ? 0.10 : 0.02), location: 0.75),
+            .init(color: Color.clear, location: 1.0)
+        ])
+        cardCtx.fill(cardPath, with: .radialGradient(cosmicGlow, center: glowCenter, startRadius: 0, endRadius: glowRadius))
+
+        // 4. Animated Gemini Gradient Border
         if f.zoneAlpha > 0 {
             var borderCtx = c
             borderCtx.opacity = f.zoneAlpha
-            let borderColor = f.zoneOver
-                ? Color(red:0.204,green:0.831,blue:0.600).opacity(0.55)
-                : Color.white.opacity(0.14)
-            let inset = CGRect(x: USC.CARD_X+0.75, y: USC.CARD_Y+0.75,
-                               width: USC.CARD_W-1.5, height: USC.CARD_H-1.5)
-            // dashPhase increases → pattern marches left-to-right at ~20 pt/s
-            let dashPhase = CGFloat(wallTime * 20)
-            borderCtx.stroke(roundedRect(inset, r: USC.CARD_R-0.5),
-                             with: .color(borderColor),
-                             style: StrokeStyle(lineWidth:1.5, dash:[6,5], dashPhase: dashPhase))
+            let dashPhase = CGFloat(wallTime * 28) // smooth march
+
+            let borderGradient = Gradient(stops: [
+                .init(color: Color(hex: "#38BDF8").opacity(isHovered ? 0.90 : 0.35), location: 0),
+                .init(color: Color(hex: "#818CF8").opacity(isHovered ? 0.90 : 0.35), location: 0.35),
+                .init(color: Color(hex: "#C084FC").opacity(isHovered ? 0.90 : 0.35), location: 0.70),
+                .init(color: Color(hex: "#38BDF8").opacity(isHovered ? 0.90 : 0.35), location: 1.0)
+            ])
+
+            let insetRect = CGRect(x: USC.CARD_X + 0.75, y: USC.CARD_Y + 0.75, width: USC.CARD_W - 1.5, height: USC.CARD_H - 1.5)
+            let inPath = roundedRect(insetRect, r: USC.CARD_R - 0.75)
+
+            if isHovered {
+                var glowCtx = borderCtx
+                glowCtx.addFilter(.blur(radius: 5))
+                glowCtx.stroke(
+                    inPath,
+                    with: .linearGradient(borderGradient, startPoint: CGPoint(x: USC.CARD_X, y: USC.CARD_Y), endPoint: CGPoint(x: USC.CARD_X + USC.CARD_W, y: USC.CARD_Y + USC.CARD_H)),
+                    style: StrokeStyle(lineWidth: 2.0, dash: [8, 6], dashPhase: dashPhase)
+                )
+            }
+
+            borderCtx.stroke(
+                inPath,
+                with: .linearGradient(borderGradient, startPoint: CGPoint(x: USC.CARD_X, y: USC.CARD_Y), endPoint: CGPoint(x: USC.CARD_X + USC.CARD_W, y: USC.CARD_Y + USC.CARD_H)),
+                style: StrokeStyle(lineWidth: isHovered ? 1.5 : 1.0, dash: isHovered ? [8, 6] : [6, 5], dashPhase: dashPhase)
+            )
         }
 
-        // ── Drop zone text ─────────────────────────────────────────
+        // 5. Drop Zone Welcoming Content
         if f.zoneAlpha > 0 && f.textAlpha > 0 {
             drawDropText(ctx: &c, f: f)
         }
 
-        // ── Progress bar ──────────────────────────────────────────
+        // 6. Progress Bar (Uploading Phase)
         if f.barAlpha > 0 || f.barReveal > 0 {
-            drawProgressBar(ctx: &c, f: f)
+            drawProgressBar(ctx: &c, f: f, wallTime: wallTime)
         }
 
-        // ── Choose view text ─────────────────────────────────────
+        // 7. Choose View Text (Attached & Ready)
         if f.chooseAlpha > 0 {
             drawChooseView(ctx: &c, f: f)
         }
 
-        // ── Mochi ─────────────────────────────────────────────────
-        drawMochi(ctx: &c, f: f)
+        // 8. Living Gemini Star Character
+        drawGeminiStar(ctx: &c, f: f, wallTime: wallTime)
 
-        // ── File / suction ────────────────────────────────────────
-        if f.fileVisible { drawFile(ctx: &c, f: f) }
+        // 9. File & Cosmic Absorption
+        if f.fileVisible {
+            drawFile(ctx: &c, f: f, wallTime: wallTime)
+        }
     }
 
-    // MARK: - Drop zone text + chips
+    // MARK: - Drop Zone Text + Context Chips
 
     private func drawDropText(ctx: inout GraphicsContext, f: USFrame) {
         var tCtx = ctx
         tCtx.opacity = f.textAlpha
 
-        let label = Text("Drop your files here")
-            .font(.system(size:13, weight:.medium))
-            .foregroundColor(Color(hex:"#D5D7DB"))
-        tCtx.draw(label, at: CGPoint(x: USC.TEXT_X, y: USC.TEXT_Y - 4), anchor: .leading)
+        // Header with sparkle
+        let header = Text("✦ Drop files to attach to Antigravity")
+            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+            .foregroundColor(Color(hex: "#F8FAFC"))
+        tCtx.draw(header, at: CGPoint(x: USC.TEXT_X, y: USC.TEXT_Y - 8), anchor: .leading)
 
-        let chips = ["PDF","Images","Code","Docs"]
+        // Subtitle
+        let sub = Text("Context will be instantly analyzed by Gemini 3.8 Flash")
+            .font(.system(size: 11.5))
+            .foregroundColor(Color(hex: "#94A3B8"))
+        tCtx.draw(sub, at: CGPoint(x: USC.TEXT_X, y: USC.TEXT_Y + 11), anchor: .leading)
+
+        // Filetype pill badges
+        let chips: [(String, String)] = [
+            ("Code", "#38BDF8"),
+            ("PDF", "#818CF8"),
+            ("Docs", "#A855F7"),
+            ("Images", "#EC4899"),
+            ("Data", "#10B981")
+        ]
+
         var cx = USC.TEXT_X
-        for chip in chips {
-            let chipText = Text(chip).font(.system(size:11, weight:.medium)).foregroundColor(Color(hex:"#B9BDC4"))
-            // measure approximate width
-            let estW = Double(chip.count) * 6.5 + 16
-            tCtx.fill(roundedRect(CGRect(x:cx, y:USC.TEXT_Y+9, width:estW, height:18), r:9),
-                      with: .color(Color.white.opacity(0.07)))
-            tCtx.draw(chipText, at: CGPoint(x: cx + 8, y: USC.TEXT_Y + 18), anchor: .leading)
-            cx += estW + 6
+        let chipY = USC.TEXT_Y + 28
+        for (label, colorHex) in chips {
+            let chipText = Text(label)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundColor(Color(hex: colorHex))
+
+            let estW = Double(label.count) * 6.8 + 18.0
+            let chipRect = CGRect(x: cx, y: chipY, width: estW, height: 18)
+
+            tCtx.fill(roundedRect(chipRect, r: 9), with: .color(Color(hex: colorHex).opacity(0.12)))
+            tCtx.stroke(roundedRect(chipRect, r: 9), with: .color(Color(hex: colorHex).opacity(0.28)), lineWidth: 0.8)
+            tCtx.draw(chipText, at: CGPoint(x: cx + estW / 2, y: chipY + 9), anchor: .center)
+
+            cx += estW + 6.0
         }
     }
 
-    // MARK: - Progress bar
+    // MARK: - Progress Bar (Gemini Gradient with Stardust Glow)
 
-    private func drawProgressBar(ctx: inout GraphicsContext, f: USFrame) {
+    private func drawProgressBar(ctx: inout GraphicsContext, f: USFrame, wallTime: Double) {
         var pCtx = ctx
         pCtx.opacity = max(f.barAlpha, 0.001)
 
-        let x0 = USC.BAR_X0, x1 = USC.BAR_X1, by = USC.BAR_Y
-        let barLen = (x1-x0) * f.barReveal
+        let x0 = USC.BAR_X0 + 20
+        let x1 = USC.BAR_X1
+        let by = USC.BAR_Y
+        let barLen = (x1 - x0) * f.barReveal
 
-        // Filename label
+        // File Header Row
         let name = state.droppedFile?.name ?? "file"
-        let label = Text("Uploading \(name)")
-            .font(.system(size:12.5, weight:.medium))
-            .foregroundColor(Color(hex:"#A9ADB5"))
-        pCtx.draw(label, at: CGPoint(x: x0, y: by-30), anchor: .leading)
+        let label = Text("Attaching \(name)")
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundColor(Color(hex: "#F8FAFC"))
+        pCtx.draw(label, at: CGPoint(x: x0, y: by - 26), anchor: .leading)
 
-        // Checkmark or percentage
+        // Percentage or Completed Checkmark
         if f.check > 0 {
             var ckCtx = pCtx
-            ckCtx.concatenate(CGAffineTransform(translationX: CGFloat(x1-8), y: CGFloat(by-30)))
+            ckCtx.concatenate(CGAffineTransform(translationX: CGFloat(x1 - 10), y: CGFloat(by - 26)))
             ckCtx.concatenate(CGAffineTransform(scaleX: CGFloat(f.check), y: CGFloat(f.check)))
-            var circle = Path(); circle.addEllipse(in: CGRect(x:-8,y:-8,width:16,height:16))
-            ckCtx.fill(circle, with: .color(Color(hex:"#34D399")))
+
+            var circle = Path()
+            circle.addEllipse(in: CGRect(x: -9, y: -9, width: 18, height: 18))
+            ckCtx.fill(circle, with: .color(Color(hex: "#10B981")))
+
             var ck = Path()
-            ck.move(to: CGPoint(x:-3.6,y:0.2)); ck.addLine(to: CGPoint(x:-1,y:2.8)); ck.addLine(to: CGPoint(x:3.8,y:-2.6))
-            ckCtx.stroke(ck, with: .color(Color(red:0.027,green:0.075,blue:0.055)),
-                         style: StrokeStyle(lineWidth:2, lineCap:.round, lineJoin:.round))
+            ck.move(to: CGPoint(x: -4, y: 0.2))
+            ck.addLine(to: CGPoint(x: -1.2, y: 3.2))
+            ck.addLine(to: CGPoint(x: 4.5, y: -2.8))
+            ckCtx.stroke(ck, with: .color(.white), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         } else {
-            let pct = Text("\(Int(f.progress*100)) %")
-                .font(.system(size:12.5, weight:.medium).monospacedDigit())
-                .foregroundColor(Color(hex:"#A9ADB5"))
-            pCtx.draw(pct, at: CGPoint(x: x1, y: by-30), anchor: .trailing)
+            let pct = Text("\(Int(f.progress * 100)) %")
+                .font(.system(size: 12.5, weight: .bold, design: .monospaced))
+                .foregroundColor(Color(hex: "#38BDF8"))
+            pCtx.draw(pct, at: CGPoint(x: x1, y: by - 26), anchor: .trailing)
         }
 
-        // Bar track
+        // Track (Dark Glass)
         if barLen > 0 {
-            pCtx.fill(roundedRect(CGRect(x:x0, y:by-3, width:barLen, height:6), r:3),
-                      with: .color(Color.white.opacity(0.08)))
+            pCtx.fill(roundedRect(CGRect(x: x0, y: by - 3, width: barLen, height: 6), r: 3), with: .color(Color.white.opacity(0.08)))
         }
 
-        // Bar fill
-        let fx = usLerp(USC.BAR_X0, USC.BAR_X1, f.progress)
+        // Bar Fill (Vibrant Gemini Gradient)
+        let fx = usLerp(x0, x1, f.progress)
         if fx > x0 + 1 {
-            // Flash color at completion
-            let flashGreen = Color(
-                red:   usLerp(0.204, 0.431, f.flash),
-                green: usLerp(0.827, 0.906, f.flash),
-                blue:  usLerp(0.600, 0.718, f.flash))
             let fillGrad = Gradient(stops: [
-                .init(color: Color(hex:"#1FA87A"), location:0),
-                .init(color: flashGreen, location:1)
+                .init(color: Color(hex: "#2563EB"), location: 0),
+                .init(color: Color(hex: "#38BDF8"), location: 0.5),
+                .init(color: Color(hex: "#A855F7"), location: 1.0)
             ])
-            pCtx.fill(roundedRect(CGRect(x:x0, y:by-3, width:fx-x0, height:6), r:3),
-                      with: .linearGradient(fillGrad,
-                                           startPoint: CGPoint(x:x0, y:0),
-                                           endPoint:   CGPoint(x:fx,  y:0)))
-        }
 
-        // Glow trail
-        if f.progress > 0.01 && f.progress < 1 {
-            let v = (usProgressAt(f.t+0.01, progStart:USC.T_PROG_START, progEnd:f.progEnd)
-                   - usProgressAt(f.t,      progStart:USC.T_PROG_START, progEnd:f.progEnd)) / 0.01
-            let tl = max(8, min(34, 8 + v*40))
-            let tGrad = Gradient(stops:[
-                .init(color: Color(red:0.204,green:0.831,blue:0.600,opacity:0), location:0),
-                .init(color: Color(red:0.431,green:0.906,blue:0.718,opacity:0.6), location:1)
-            ])
-            var glowCtx = pCtx
-            glowCtx.addFilter(.blur(radius:3))
-            glowCtx.fill(roundedRect(CGRect(x:fx-tl, y:by-4, width:tl, height:8), r:4),
-                         with: .linearGradient(tGrad,
-                                              startPoint:CGPoint(x:fx-tl,y:0),
-                                              endPoint:  CGPoint(x:fx,y:0)))
+            pCtx.fill(roundedRect(CGRect(x: x0, y: by - 3, width: fx - x0, height: 6), r: 3),
+                      with: .linearGradient(fillGrad, startPoint: CGPoint(x: x0, y: 0), endPoint: CGPoint(x: fx, y: 0)))
+
+            // Glowing Leading Tip
+            if f.progress < 0.999 {
+                var tipGlow = pCtx
+                tipGlow.addFilter(.blur(radius: 4))
+                let tipCircle = Path(ellipseIn: CGRect(x: fx - 8, y: by - 7, width: 14, height: 14))
+                tipGlow.fill(tipCircle, with: .color(Color(hex: "#38BDF8").opacity(0.85)))
+            }
         }
     }
 
-    // MARK: - Choose view text + buttons (canvas layer)
+    // MARK: - Choose View Text
 
     private func drawChooseView(ctx: inout GraphicsContext, f: USFrame) {
         var cCtx = ctx
         cCtx.opacity = f.chooseAlpha
-        // Slide up: translate down by (1-alpha)*4
-        cCtx.concatenate(CGAffineTransform(translationX: 0, y: CGFloat((1-f.chooseAlpha)*4)))
+        cCtx.concatenate(CGAffineTransform(translationX: 0, y: CGFloat((1 - f.chooseAlpha) * 4)))
 
         let name = state.droppedFile?.name ?? "file"
-        let titleText = Text("\(name) is ready.")
-            .font(.system(size:14, weight:.semibold))
-            .foregroundColor(Color(hex:"#F5F6F8"))
-        cCtx.draw(titleText, at: CGPoint(x:114, y:80), anchor: .leading)
 
-        let subText = Text("What do you want to do with it?")
-            .font(.system(size:12.5))
-            .foregroundColor(Color(hex:"#9398A1"))
-        cCtx.draw(subText, at: CGPoint(x:114, y:100), anchor: .leading)
+        // Badge: Attached to Context
+        let badge = Text("● Attached to Context")
+            .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+            .foregroundColor(Color(hex: "#10B981"))
+        cCtx.draw(badge, at: CGPoint(x: 120, y: 72), anchor: .leading)
 
-        // Primary button (white fill)
-        cCtx.fill(roundedRect(CGRect(x:114,y:113,width:168,height:26), r:13),
-                  with: .color(Color(hex:"#F5F6F8")))
-        let btn1 = Text("Ask a question about it")
-            .font(.system(size:12.5, weight:.medium))
-            .foregroundColor(Color(red:0.043,green:0.047,blue:0.055))
-        cCtx.draw(btn1, at: CGPoint(x:198, y:126), anchor: .center)
+        let titleText = Text("\(name) is ready")
+            .font(.system(size: 14, weight: .bold, design: .rounded))
+            .foregroundColor(Color(hex: "#F8FAFC"))
+        cCtx.draw(titleText, at: CGPoint(x: 120, y: 88), anchor: .leading)
 
-        // Secondary button (dim fill)
-        cCtx.fill(roundedRect(CGRect(x:290,y:113,width:120,height:26), r:13),
-                  with: .color(Color.white.opacity(0.09)))
-        let btn2 = Text("Send by email")
-            .font(.system(size:12.5, weight:.medium))
-            .foregroundColor(Color(hex:"#F1F2F4"))
-        cCtx.draw(btn2, at: CGPoint(x:350, y:126), anchor: .center)
+        let subText = Text("Context loaded into Google Antigravity. Start asking questions.")
+            .font(.system(size: 11.5))
+            .foregroundColor(Color(hex: "#94A3B8"))
+        cCtx.draw(subText, at: CGPoint(x: 120, y: 104), anchor: .leading)
     }
 
-    // MARK: - Mochi (superellipse body + eyes + mouth)
+    // MARK: - Living Gemini Star Character (Replaces Mochi)
 
-    private func drawMochi(ctx: inout GraphicsContext, f: USFrame) {
-        let R  = f.d / 2 / 1.04
-        let m  = f.morph
-        let mc = max(0, min(m, 1.0))
-
+    private func drawGeminiStar(ctx: inout GraphicsContext, f: USFrame, wallTime: Double) {
         var c = ctx
-        c.concatenate(CGAffineTransform(translationX: CGFloat(f.x), y: CGFloat(f.y + f.hop)))
+        let cx = CGFloat(f.x)
+        let cy = CGFloat(f.y + f.hop)
+
+        c.concatenate(CGAffineTransform(translationX: cx, y: cy))
         c.concatenate(CGAffineTransform(rotationAngle: CGFloat(f.tilt)))
         c.concatenate(CGAffineTransform(scaleX: CGFloat(f.sx), y: CGFloat(f.sy)))
 
-        let (bp, rx, ry) = usBodyPath(m: m, R: R)
+        let starR = max(14.0, (f.d / 2.0) * 0.95)
 
-        // ── Body gradient ──────────────────────────────────────────
-        let bodyGrad = Gradient(stops:[
-            .init(color: Color(hex:"#EDEDEF"), location:0),
-            .init(color: Color(hex:"#C4C5CA"), location:1)
+        // 1. Ambient Celestial Glow Aura
+        var auraCtx = c
+        let auraGrad = Gradient(stops: [
+            .init(color: Color(hex: "#38BDF8").opacity(0.35), location: 0),
+            .init(color: Color(hex: "#818CF8").opacity(0.12), location: 0.5),
+            .init(color: Color.clear, location: 1.0)
         ])
-        c.fill(bp, with: .linearGradient(bodyGrad,
-            startPoint:  CGPoint(x:  rx*0.7, y: -ry*0.9),
-            endPoint:    CGPoint(x: -rx*0.8, y:  ry*0.9)))
+        let auraCircle = Path(ellipseIn: CGRect(x: -starR * 1.5, y: -starR * 1.5, width: starR * 3.0, height: starR * 3.0))
+        auraCtx.fill(auraCircle, with: .radialGradient(auraGrad, center: .zero, startRadius: 1, endRadius: starR * 1.5))
 
-        // ── Edge shadow ────────────────────────────────────────────
-        let shadowGrad = Gradient(stops:[
-            .init(color: .clear, location:0),
-            .init(color: .clear, location:0.62),
-            .init(color: Color.black.opacity(0.12), location:1)
-        ])
-        c.fill(bp, with: .radialGradient(shadowGrad,
-            center: CGPoint(x:0,y:0), startRadius: CGFloat(R*0.2), endRadius: CGFloat(R*1.3)))
-
-        // ── Top rim (box mode) ─────────────────────────────────────
-        if mc > 0.3 {
-            let rimAlpha = max(0, min(1, (mc-0.3)/0.7))
-            var rimCtx = c
-            rimCtx.clip(to: bp)
-            var rim = Path()
-            rim.move(to: CGPoint(x: -rx*0.72, y: -ry+0.9))
-            rim.addLine(to: CGPoint(x: rx*0.72,  y: -ry+0.9))
-            rimCtx.stroke(rim, with: .color(Color.white.opacity(0.6*rimAlpha)),
-                          style: StrokeStyle(lineWidth:1.2, lineCap:.round))
+        // 2. Orbiting Sparkles & Celestial Ring
+        let orbitRot = wallTime * 55.0
+        for i in 0..<3 {
+            let angle = Double(i) * 120.0 + orbitRot
+            let rad = angle * .pi / 180.0
+            let dist = starR * 1.25
+            let px = cos(rad) * dist
+            let py = sin(rad) * dist * 0.45 // tilted ellipse orbit
+            var sp = Path()
+            sp.addEllipse(in: CGRect(x: px - 2, y: py - 2, width: 4, height: 4))
+            c.fill(sp, with: .color(Color.white.opacity(0.85)))
         }
 
-        // ── Mouth hole ─────────────────────────────────────────────
-        let mh = f.mouth * R * mc
-        if mh > 0.3 {
-            let mw  = 2*rx - 0.24*R
-            let mxO = CGFloat(-mw/2)
-            let myO = CGFloat(-ry + 0.10*R)
-            let mhr = CGFloat(min(mw/2, mh/2))
-            var mCtx = c
-            mCtx.clip(to: bp)
-            let holeGrad = Gradient(stops:[
-                .init(color: Color(red:0.012,green:0.012,blue:0.016), location:0),
-                .init(color: Color(red:0.063,green:0.067,blue:0.078), location:1)
-            ])
-            let holePath = roundedRect(CGRect(x:mxO, y:myO, width:CGFloat(mw), height:CGFloat(mh)), r:Double(mhr))
-            mCtx.fill(holePath, with: .linearGradient(holeGrad,
-                startPoint: CGPoint(x:0, y:myO),
-                endPoint:   CGPoint(x:0, y:myO+CGFloat(mh))))
-            // Bottom lip
-            if mh > 4 {
-                var lip = Path()
-                lip.move(to:    CGPoint(x:mxO+mhr,              y:myO+CGFloat(mh)+0.5))
-                lip.addLine(to: CGPoint(x:mxO+CGFloat(mw)-mhr,  y:myO+CGFloat(mh)+0.5))
-                mCtx.stroke(lip, with: .color(Color.white.opacity(0.55)),
-                            style: StrokeStyle(lineWidth:1, lineCap:.round))
+        // 3. The 4-Pointed Star Body
+        let starPath = geminiStarPath(cx: 0, cy: 0, r: starR)
+
+        let starGradient = Gradient(stops: [
+            .init(color: Color(hex: "#38BDF8"), location: 0),
+            .init(color: Color(hex: "#3B82F6"), location: 0.45),
+            .init(color: Color(hex: "#8B5CF6"), location: 1.0)
+        ])
+
+        c.fill(starPath, with: .linearGradient(starGradient, startPoint: CGPoint(x: -starR, y: -starR), endPoint: CGPoint(x: starR, y: starR)))
+
+        // Inner Specular Glass Rim
+        c.stroke(
+            starPath,
+            with: .linearGradient(
+                Gradient(stops: [
+                    .init(color: Color.white.opacity(0.75), location: 0),
+                    .init(color: Color.white.opacity(0.2), location: 0.4),
+                    .init(color: Color.clear, location: 0.8)
+                ]),
+                startPoint: CGPoint(x: -starR, y: -starR),
+                endPoint: CGPoint(x: starR, y: starR)
+            ),
+            lineWidth: 1.4
+        )
+
+        // 4. Cheeks (Cute Blush)
+        let blushY = starR * 0.22
+        let blushSpacing = starR * 0.40
+        for side in [-1.0, 1.0] {
+            var cheek = Path()
+            cheek.addEllipse(in: CGRect(x: side * blushSpacing - starR * 0.12, y: blushY, width: starR * 0.24, height: starR * 0.13))
+            c.fill(cheek, with: .color(Color(hex: "#F472B6").opacity(0.80)))
+        }
+
+        // 5. Expressive Eyes
+        let eyeY = starR * 0.05
+        let eyeSpacing = starR * 0.25
+        let eyeW = starR * 0.18
+        let eyeH = starR * 0.28
+        let lookX = f.lookX * (starR * 0.15)
+        let lookY = f.lookY * (starR * 0.10)
+
+        // Happy smile eyes when file is absorbed or complete
+        let isHappy = f.suck > 0.6 || f.check > 0 || f.chooseAlpha > 0.5
+        for side in [-1.0, 1.0] {
+            let ex = side * eyeSpacing + lookX
+            let ey = eyeY + lookY
+
+            if isHappy {
+                // Curved happy eye arc (^ ^)
+                var arc = Path()
+                arc.addArc(center: CGPoint(x: ex, y: ey + eyeH * 0.4), radius: eyeW * 0.8, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+                c.stroke(arc, with: .color(Color(hex: "#090B10")), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+            } else {
+                // Sentient pill eye
+                var eye = Path()
+                eye.addRoundedRect(in: CGRect(x: ex - eyeW / 2, y: ey - eyeH / 2, width: eyeW, height: eyeH), cornerSize: CGSize(width: eyeW / 2, height: eyeW / 2))
+                c.fill(eye, with: .color(Color(hex: "#090B10")))
+
+                // Catchlight sparkle in eye
+                var catchlight = Path()
+                catchlight.addEllipse(in: CGRect(x: ex - eyeW * 0.28, y: ey - eyeH * 0.32, width: eyeW * 0.45, height: eyeW * 0.45))
+                c.fill(catchlight, with: .color(.white))
             }
         }
-
-        // ── Eyes ───────────────────────────────────────────────────
-        let ew = R * 0.25
-        let eh = R * (0.62 - 0.16*mc)
-        let ey = R * (0.02 + 0.28*mc)
-        let sp = R * 0.30
-        let lx = f.lookX * R * (0.34 - 0.08*mc)
-        let ly = f.lookY * R * (0.16 - 0.09*mc)
-
-        var eCtx = c
-        eCtx.clip(to: bp)
-        for sd in [-1.0, 1.0] {
-            var ec = eCtx
-            ec.concatenate(CGAffineTransform(translationX: CGFloat(sd*sp+lx), y: CGFloat(ey+ly)))
-            drawEyeShape(ctx: &ec, shape: f.eye, w: CGFloat(ew), h: CGFloat(eh))
-        }
     }
 
-    // MARK: - Eye shapes
+    // MARK: - File & Cosmic Absorption (Smooth Stardust Glide, No Mouth)
 
-    private func drawEyeShape(ctx: inout GraphicsContext, shape: USEyeShape, w: CGFloat, h: CGFloat) {
-        let ink = Color(red:0.055,green:0.059,blue:0.071)
-        switch shape {
-        case .pill:
-            var p = Path()
-            p.addRoundedRect(in: CGRect(x:-w/2, y:-h/2, width:w, height:h),
-                             cornerSize: CGSize(width:w/2, height:w/2))
-            ctx.fill(p, with: .color(ink))
+    private func drawFile(ctx: inout GraphicsContext, f: USFrame, wallTime: Double) {
+        let cx = f.cursorX
+        let cy = f.cursorY + 14
 
-        case .cup:
-            // Flat top + semicircle bottom (cup shape)
-            let hh = h * 0.55
-            var p = Path()
-            p.move(to: CGPoint(x:-w/2, y:-hh/2))
-            p.addLine(to: CGPoint(x: w/2, y:-hh/2))
-            p.addLine(to: CGPoint(x: w/2, y: hh/2-w/2))
-            p.addArc(center: CGPoint(x:0, y:hh/2-w/2), radius:w/2, startAngle:.degrees(0), endAngle:.degrees(180), clockwise:false)
-            p.closeSubpath()
-            ctx.fill(p, with: .color(ink))
-
-        case .content:
-            // Upward arc (content / happy)
-            var p = Path()
-            p.addArc(center: CGPoint(x:0, y:-h*0.12), radius:w*0.85,
-                     startAngle:.degrees(180*0.15), endAngle:.degrees(180*0.85), clockwise:false)
-            ctx.stroke(p, with: .color(ink),
-                       style: StrokeStyle(lineWidth:w*0.5, lineCap:.round))
-        }
-    }
-
-    // MARK: - File / suction (drawFile port)
-
-    private func drawFile(ctx: inout GraphicsContext, f: USFrame) {
-        let cx = f.cursorX, cy = f.cursorY + 14
+        // Idle floating file before drop
         if f.suck <= 0 {
-            var fc = ctx; fc.opacity = 0.92
-            drawDoc(ctx: &fc, cx: cx, cy: cy, wsc:1, hsc:1)
+            var fc = ctx
+            fc.opacity = 0.95
+            drawModernDoc(ctx: &fc, cx: cx, cy: cy, scale: 1.0, rot: 0)
             return
         }
 
-        let m   = f.mouthRect
-        let W0  = 34.0, H0 = 42.0
-        let p   = usEIn(f.suck)
-        let topY = usLerp(cy - H0/2, m.y - 2, usEInOut(f.suck))
-        let hs  = usLerp(1.08, 0.55, usEInOut(f.suck))
-        let Hh  = H0 * hs
-        let sc  = usLerp(1, 0.55, p)
-        let q   = usEOut(f.suck)
-        let fCx = usLerp(cx, m.x + m.w/2, usEOut(f.suck))
-        let wob = sin(f.suck * .pi * 2) * 0.1 * (1-p)
-        let clipY = m.y + m.h * 0.5
+        // Absorbing file: glides directly into Gemini Star
+        let p = usEIn(f.suck)
+        let q = usEOut(f.suck)
 
-        // Use withCGContext for the complex strip clipping
-        ctx.withCGContext { cg in
-            cg.saveGState()
-            // Outer clip: above mouth
-            cg.clip(to: CGRect(x:0, y:0, width:640, height:clipY))
+        // Target coordinates = Star center
+        let targetX = f.x
+        let targetY = f.y
 
-            for i in 0..<28 {
-                let v0 = Double(i) / 28
-                let wsc = usLerp(1, usLerp(0.92, 0.22*m.w/W0, pow(v0,1.2)), q) * sc
-                let yy  = topY + v0*Hh
-                let hh  = Hh/28 + 0.6
+        let curX = usLerp(cx, targetX, q)
+        let curY = usLerp(cy, targetY, usEInOut(f.suck))
+        let curScale = usLerp(1.0, 0.12, p)
+        let curRot = sin(f.suck * .pi * 2.5) * 0.25 * (1.0 - p)
+        let curOpacity = max(0, 1.0 - p * 1.1)
 
-                cg.saveGState()
-                cg.translateBy(x: CGFloat(fCx), y: CGFloat(yy))
-                cg.rotate(by: CGFloat(wob))
-                cg.clip(to: CGRect(x: CGFloat(-W0*wsc/2), y:0, width: CGFloat(W0*wsc), height: CGFloat(hh)))
-                cg.translateBy(x: CGFloat(-fCx), y: CGFloat(-yy))
-                drawDocCG(cg: cg, cx: fCx, cy: topY+Hh/2, wsc: wsc, hsc: hs, fileIcon: fileIcon)
-                cg.restoreGState()
-            }
-            cg.restoreGState()
+        if curOpacity > 0.01 {
+            var fc = ctx
+            fc.opacity = curOpacity
+            drawModernDoc(ctx: &fc, cx: curX, cy: curY, scale: curScale, rot: curRot)
         }
 
-        // Green particles
-        for i in 0..<4 {
-            let a   = Double(i)/4 * .pi*2 + 0.6
-            let r0  = 24.0
-            let k   = max(0, min(1, (f.suck - Double(i)*0.08) / 0.7))
-            guard k > 0 && k < 1 else { continue }
-            let sx0 = cx + cos(a)*r0, sy0 = cy + sin(a)*r0
-            let ex  = m.x + m.w/2,    ey  = m.y + m.h*0.3
-            let kk  = pow(k, 0.7)
-            let px  = usLerp(sx0,ex,kk), py = usLerp(sy0,ey,kk) - sin(.pi*k)*6
-            let rad = 2.2*(1-k*0.5)
-            var pp = Path(); pp.addEllipse(in: CGRect(x:px-rad, y:py-rad, width:rad*2, height:rad*2))
-            ctx.fill(pp, with: .color(Color(red:0.204,green:0.831,blue:0.600).opacity(1-k)))
+        // Cosmic Stardust Particles Inflow
+        for i in 0..<6 {
+            let a = Double(i) / 6.0 * .pi * 2.0 + wallTime * 3.0
+            let r0 = 36.0 * (1.0 - f.suck)
+            let sx0 = curX + cos(a) * r0
+            let sy0 = curY + sin(a) * r0
+            let px = usLerp(sx0, targetX, p)
+            let py = usLerp(sy0, targetY, p)
+            let rad = 2.4 * (1.0 - p * 0.5)
+
+            var part = Path()
+            part.addEllipse(in: CGRect(x: px - rad, y: py - rad, width: rad * 2, height: rad * 2))
+
+            let pColor = (i % 2 == 0) ? Color(hex: "#38BDF8") : Color(hex: "#C084FC")
+            ctx.fill(part, with: .color(pColor.opacity(1.0 - p * 0.8)))
         }
     }
 
-    // MARK: - Doc icon (SwiftUI wrapper)
+    // MARK: - Modern Document Card Component
 
-    private func drawDoc(ctx: inout GraphicsContext, cx: Double, cy: Double, wsc: Double, hsc: Double) {
-        let w = 34*wsc, h = 42*hsc
-        let x = cx-w/2, y = cy-h/2
-        let fold = 8*min(wsc,hsc)
+    private func drawModernDoc(ctx: inout GraphicsContext, cx: Double, cy: Double, scale: Double, rot: Double) {
+        var dCtx = ctx
+        dCtx.concatenate(CGAffineTransform(translationX: CGFloat(cx), y: CGFloat(cy)))
+        dCtx.concatenate(CGAffineTransform(rotationAngle: CGFloat(rot)))
+        dCtx.concatenate(CGAffineTransform(scaleX: CGFloat(scale), y: CGFloat(scale)))
 
-        var bodyCtx = ctx
-        bodyCtx.addFilter(.shadow(color:.black.opacity(0.45), radius:8, x:0, y:3))
+        let w = 38.0
+        let h = 48.0
+        let x = -w / 2.0
+        let y = -h / 2.0
+        let fold = 10.0
+
+        // Soft drop shadow
+        var sCtx = dCtx
+        sCtx.addFilter(.shadow(color: Color.black.opacity(0.45), radius: 8, x: 0, y: 4))
+
+        // Body Shape with folded corner
         var body = Path()
-        body.move(to: CGPoint(x:x+2,y:y))
-        body.addLine(to: CGPoint(x:x+w-fold,y:y))
-        body.addLine(to: CGPoint(x:x+w,y:y+fold))
-        body.addLine(to: CGPoint(x:x+w,y:y+h-2))
-        body.addQuadCurve(to: CGPoint(x:x+w-2,y:y+h), control:CGPoint(x:x+w,y:y+h))
-        body.addLine(to: CGPoint(x:x+2,y:y+h))
-        body.addQuadCurve(to: CGPoint(x:x,y:y+h-2), control:CGPoint(x:x,y:y+h))
-        body.addLine(to: CGPoint(x:x,y:y+2))
-        body.addQuadCurve(to: CGPoint(x:x+2,y:y), control:CGPoint(x:x,y:y))
+        body.move(to: CGPoint(x: x + 3, y: y))
+        body.addLine(to: CGPoint(x: x + w - fold, y: y))
+        body.addLine(to: CGPoint(x: x + w, y: y + fold))
+        body.addLine(to: CGPoint(x: x + w, y: y + h - 3))
+        body.addQuadCurve(to: CGPoint(x: x + w - 3, y: y + h), control: CGPoint(x: x + w, y: y + h))
+        body.addLine(to: CGPoint(x: x + 3, y: y + h))
+        body.addQuadCurve(to: CGPoint(x: x, y: y + h - 3), control: CGPoint(x: x, y: y + h))
+        body.addLine(to: CGPoint(x: x, y: y + 3))
+        body.addQuadCurve(to: CGPoint(x: x + 3, y: y), control: CGPoint(x: x, y: y))
         body.closeSubpath()
-        bodyCtx.fill(body, with: .color(Color(red:0.957,green:0.957,blue:0.965)))
 
-        var foldPath = Path()
-        foldPath.move(to: CGPoint(x:x+w-fold,y:y))
-        foldPath.addLine(to: CGPoint(x:x+w-fold,y:y+fold))
-        foldPath.addLine(to: CGPoint(x:x+w,y:y+fold))
-        ctx.fill(foldPath, with: .color(Color(red:0.835,green:0.839,blue:0.859)))
+        // Pure white/frosted glass card
+        sCtx.fill(body, with: .color(Color(hex: "#F8FAFC")))
 
-        ctx.fill(roundedRect(CGRect(x:x+w*0.18,y:y+h*0.58,width:w*0.64,height:h*0.16),r:2),
-                 with: .color(Color(red:0.231,green:0.510,blue:0.961)))
+        // Folded flap
+        var flap = Path()
+        flap.move(to: CGPoint(x: x + w - fold, y: y))
+        flap.addLine(to: CGPoint(x: x + w - fold, y: y + fold))
+        flap.addLine(to: CGPoint(x: x + w, y: y + fold))
+        flap.closeSubpath()
+        dCtx.fill(flap, with: .color(Color(hex: "#E2E8F0")))
+
+        // Document extension badge
+        let ext = (state.droppedFile?.name.split(separator: ".").last?.uppercased() ?? "FILE").prefix(4)
+        let badgeRect = CGRect(x: x + 5, y: y + h - 16, width: w - 10, height: 11)
+        dCtx.fill(roundedRect(badgeRect, r: 2.5), with: .color(Color(hex: "#2563EB")))
+
+        let extText = Text(String(ext))
+            .font(.system(size: 7.5, weight: .bold, design: .rounded))
+            .foregroundColor(.white)
+        dCtx.draw(extText, at: CGPoint(x: badgeRect.midX, y: badgeRect.midY), anchor: .center)
+
+        // Document preview lines
+        for i in 0..<3 {
+            let lineY = y + 14.0 + Double(i) * 5.0
+            let lineW = (i == 2) ? (w - 18.0) : (w - 12.0)
+            dCtx.fill(roundedRect(CGRect(x: x + 6, y: lineY, width: lineW, height: 2), r: 1), with: .color(Color(hex: "#CBD5E1")))
+        }
     }
 }
 
-// MARK: - Doc icon in CGContext (for suction strips)
+// MARK: - 4-Point Gemini Star Geometry Path
 
-private func drawDocCG(cg: CGContext, cx: Double, cy: Double, wsc: Double, hsc: Double, fileIcon: NSImage?) {
-    let w = 34*wsc, h = 42*hsc
-    let x = cx-w/2, y = cy-h/2
-    let fold = 8.0*min(wsc,hsc)
+func geminiStarPath(cx: Double, cy: Double, r: Double) -> Path {
+    var p = Path()
+    let w = r * 2.0
+    let h = r * 2.0
+    let top = cy - r
+    let bottom = cy + r
+    let left = cx - r
+    let right = cx + r
 
-    // Use real file icon if available
-    if let icon = fileIcon,
-       let cgImg = icon.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-        cg.saveGState()
-        cg.setShadow(offset: CGSize(width:0,height:3), blur:8, color: CGColor(gray:0, alpha:0.45))
-        let rect = CGRect(x:x, y:y, width:w, height:h)
-        cg.draw(cgImg, in: rect)
-        cg.restoreGState()
-        return
-    }
+    // Top tip
+    p.move(to: CGPoint(x: cx, y: top))
+    // Top to Right (concave arc towards center)
+    p.addQuadCurve(to: CGPoint(x: right, y: cy), control: CGPoint(x: cx + w * 0.12, y: cy - h * 0.12))
+    // Right to Bottom
+    p.addQuadCurve(to: CGPoint(x: cx, y: bottom), control: CGPoint(x: cx + w * 0.12, y: cy + h * 0.12))
+    // Bottom to Left
+    p.addQuadCurve(to: CGPoint(x: left, y: cy), control: CGPoint(x: cx - w * 0.12, y: cy + h * 0.12))
+    // Left to Top
+    p.addQuadCurve(to: CGPoint(x: cx, y: top), control: CGPoint(x: cx - w * 0.12, y: cy - h * 0.12))
+    p.closeSubpath()
 
-    // Generic document shape
-    cg.saveGState()
-    cg.setShadow(offset: CGSize(width:0,height:3), blur:8, color: CGColor(gray:0, alpha:0.45))
-    cg.setFillColor(CGColor(red:0.957,green:0.957,blue:0.965,alpha:1))
-    let bp = CGMutablePath()
-    bp.move(to: CGPoint(x:x+2,y:y))
-    bp.addLine(to: CGPoint(x:x+w-fold,y:y))
-    bp.addLine(to: CGPoint(x:x+w,y:y+fold))
-    bp.addLine(to: CGPoint(x:x+w,y:y+h-2))
-    bp.addQuadCurve(to: CGPoint(x:x+w-2,y:y+h), control:CGPoint(x:x+w,y:y+h))
-    bp.addLine(to: CGPoint(x:x+2,y:y+h))
-    bp.addQuadCurve(to: CGPoint(x:x,y:y+h-2), control:CGPoint(x:x,y:y+h))
-    bp.addLine(to: CGPoint(x:x,y:y+2))
-    bp.addQuadCurve(to: CGPoint(x:x+2,y:y), control:CGPoint(x:x,y:y))
-    bp.closeSubpath()
-    cg.addPath(bp); cg.fillPath()
-    cg.restoreGState()
-
-    // Fold
-    cg.setFillColor(CGColor(red:0.835,green:0.839,blue:0.859,alpha:1))
-    let fp = CGMutablePath()
-    fp.move(to: CGPoint(x:x+w-fold,y:y)); fp.addLine(to: CGPoint(x:x+w-fold,y:y+fold)); fp.addLine(to: CGPoint(x:x+w,y:y+fold))
-    cg.addPath(fp); cg.fillPath()
-
-    // Blue accent line
-    cg.setFillColor(CGColor(red:0.231,green:0.510,blue:0.961,alpha:1))
-    cg.addRect(CGRect(x:x+w*0.18, y:y+h*0.58, width:w*0.64, height:h*0.16))
-    cg.fillPath()
+    return p
 }
 
-// MARK: - Superellipse body path (port of reference bodyPath(m, R))
-
-func usBodyPath(m: Double, R: Double) -> (path: Path, rx: Double, ry: Double) {
-    let mc = max(0, min(m, 1.0))
-    let n  = 2.15 + (5.5-2.15)*mc
-    let rx = R * (1.04 - 0.04*mc)
-    let ry = R * (0.97 - 0.03*mc)
-    var path = Path()
-    for i in 0...96 {
-        let a  = Double(i)/96 * .pi*2
-        let ca = cos(a), sa = sin(a)
-        let px = rx * (ca<0 ? -1 : ca>0 ? 1 : 0) * pow(abs(ca), 2/n)
-        let py = ry * (sa<0 ? -1 : sa>0 ? 1 : 0) * pow(abs(sa), 2/n)
-        if i == 0 { path.move(to:    CGPoint(x:px,y:py)) }
-        else       { path.addLine(to: CGPoint(x:px,y:py)) }
-    }
-    path.closeSubpath()
-    return (path, rx, ry)
-}
-
-// MARK: - Rounded rect helper (mirrors reference rr())
+// MARK: - Rounded Rect Helper
 
 func roundedRect(_ rect: CGRect, r rr: Double) -> Path {
-    let r = max(0, min(rr, Double(rect.width)/2, Double(rect.height)/2))
+    let r = max(0, min(rr, Double(rect.width) / 2, Double(rect.height) / 2))
     var p = Path()
-    p.addRoundedRect(in: rect, cornerSize: CGSize(width:r, height:r))
+    p.addRoundedRect(in: rect, cornerSize: CGSize(width: r, height: r))
     return p
 }

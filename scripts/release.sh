@@ -1,70 +1,102 @@
 #!/usr/bin/env bash
-# Usage: ./scripts/release.sh 0.1.1
+# Usage: ./scripts/release.sh 1.0.0
 set -euo pipefail
 
-VERSION="${1:?Usage: $0 <version>}"
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="/tmp/coucou-release-$VERSION"
-APP="$BUILD_DIR/Coucou.app"
-ZIP="$BUILD_DIR/Coucou.zip"
-
-# ── 1. Find Developer ID identity ─────────────────────────────────────────────
-IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(Developer ID Application[^"]*\)".*/\1/')
-if [ -z "$IDENTITY" ]; then
-  echo "error: No 'Developer ID Application' certificate found. Install it via Xcode → Settings → Accounts." >&2
+VERSION="${1:-}"
+if [ -z "$VERSION" ]; then
+  echo "Usage: $0 <version> (e.g. ./scripts/release.sh 1.0.0)"
   exit 1
 fi
-echo "Signing with: $IDENTITY"
 
-# ── 2. xcodegen + Release build ───────────────────────────────────────────────
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BUILD_DIR="/tmp/lumo-release-$VERSION"
+APP="$BUILD_DIR/Lumo.app"
+ZIP="$BUILD_DIR/Lumo.zip"
+
+echo "=== Packaging Lumo v$VERSION ==="
+
+# ── 1. Code Signing Identity ──────────────────────────────────────────────────
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application" | head -1 | sed 's/.*"\(Developer ID Application[^"]*\)".*/\1/' || true)
+
+if [ -n "$IDENTITY" ]; then
+  echo "✓ Using Apple Developer ID: $IDENTITY"
+  SIGN_FLAGS="CODE_SIGN_IDENTITY=$IDENTITY CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES"
+else
+  echo "ℹ No Developer ID Application certificate found. Building with ad-hoc signing."
+  SIGN_FLAGS="CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES"
+fi
+
+# ── 2. Xcode Release Build ────────────────────────────────────────────────────
 cd "$REPO_ROOT/NotchBuddy"
-xcodegen generate
 rm -rf "$BUILD_DIR" && mkdir -p "$BUILD_DIR"
 
+echo "Building Lumo (Release configuration)..."
 xcodebuild \
-  -project NotchBuddy.xcodeproj \
-  -scheme NotchBuddy \
+  -project Lumo.xcodeproj \
+  -scheme Lumo \
   -configuration Release \
   build \
-  CODE_SIGN_IDENTITY="$IDENTITY" \
-  CODE_SIGNING_REQUIRED=YES \
-  CODE_SIGNING_ALLOWED=YES \
+  $SIGN_FLAGS \
   CONFIGURATION_BUILD_DIR="$BUILD_DIR"
 
-# ── 3. Zip + notarize ─────────────────────────────────────────────────────────
+if [ ! -d "$APP" ]; then
+  echo "error: Build failed, $APP does not exist." >&2
+  exit 1
+fi
+
+# ── 3. Apple Notarization (Optional) ──────────────────────────────────────────
+NOTARY_PROFILE="${LUMO_NOTARY_PROFILE:-lumo-notary}"
+if [ -n "$IDENTITY" ] && xcrun notarytool credentials-history --keychain-profile "$NOTARY_PROFILE" &>/dev/null; then
+  echo "Submitting $APP to Apple Notary Service..."
+  ditto -c -k --keepParent "$APP" "$ZIP"
+  xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple "$APP"
+  spctl -a -vv "$APP" || true
+  rm "$ZIP"
+else
+  echo "ℹ Notarization skipped (no notary profile found or ad-hoc signed)."
+fi
+
+# ── 4. Package Release Archive ────────────────────────────────────────────────
+echo "Creating release zip..."
 ditto -c -k --keepParent "$APP" "$ZIP"
-xcrun notarytool submit "$ZIP" --keychain-profile coucou-notary --wait
+echo "✓ Release zip created at: $ZIP"
 
-# ── 4. Staple + verify ────────────────────────────────────────────────────────
-xcrun stapler staple "$APP"
-spctl -a -vv "$APP"
-
-# ── 5. Re-zip (with stapled app) ──────────────────────────────────────────────
-rm "$ZIP"
-ditto -c -k --keepParent "$APP" "$ZIP"
-echo "Release zip ready: $ZIP"
-
-# ── 6. Tag + GitHub release ───────────────────────────────────────────────────
+# ── 5. Tag & GitHub Release ───────────────────────────────────────────────────
 cd "$REPO_ROOT"
-git tag "v$VERSION"
-git push origin "v$VERSION"
 
-gh release create "v$VERSION" "$ZIP" \
-  --repo Louis-CFM/coucou \
-  --title "Coucou $VERSION" \
-  --notes "$(cat <<EOF
-## Install
+if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+  echo "Tag v$VERSION already exists locally."
+else
+  echo "Creating git tag v$VERSION..."
+  git tag "v$VERSION"
+fi
 
-Download **Coucou.zip**, unzip and move **Coucou.app** to \`/Applications\`. Launch — no extra steps needed.
+if command -v gh >/dev/null 2>&1; then
+  echo "Publishing release via GitHub CLI..."
+  gh release create "v$VERSION" "$ZIP" \
+    --title "Lumo v$VERSION" \
+    --notes "$(cat <<EOF
+## Lumo v$VERSION
 
-## Build from source
+A native macOS notch companion for Google Antigravity CLI (\`agy\`) & Gemini models.
 
-\`\`\`bash
-brew install xcodegen
-git clone https://github.com/Louis-CFM/coucou.git
-cd coucou/NotchBuddy && xcodegen && open NotchBuddy.xcodeproj
-\`\`\`
+### Installation
+1. Download **Lumo.zip**
+2. Unzip and drag **Lumo.app** to your \`/Applications\` folder
+3. Launch Lumo and interact with Antigravity & Gemini directly from your MacBook notch!
+
+### Requirements
+- macOS 15.0+ (Apple Silicon recommended)
+- Google Antigravity CLI (\`agy\`)
 EOF
 )"
+  echo "✓ GitHub release published successfully!"
+else
+  echo "ℹ 'gh' (GitHub CLI) is not installed."
+  echo "  To publish this release to GitHub manually, upload:"
+  echo "  -> $ZIP"
+  echo "  Or install gh via: brew install gh"
+fi
 
-echo "✓ v$VERSION released: https://github.com/Louis-CFM/coucou/releases/tag/v$VERSION"
+echo "=== Done! Lumo v$VERSION is ready at: $ZIP ==="

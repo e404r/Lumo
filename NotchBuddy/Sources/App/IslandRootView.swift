@@ -33,9 +33,9 @@ struct IslandContainer: View {
     private let closeEase  = Animation.timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
 
     private var chatPromptHeight: CGFloat {
-        let base: CGFloat = 240
+        let base: CGFloat = 260
         let perMsg: CGFloat = 40
-        return min(300, base + CGFloat(state.chatHistory.count) * perMsg)
+        return min(340, base + CGFloat(state.chatHistory.count) * perMsg)
     }
 
     /// Pixels the content must be pushed down to clear the concave ear transparent area.
@@ -53,22 +53,38 @@ struct IslandContainer: View {
         let greetingActive = state.mode == .expanded && state.view == .greeting
 
         return ZStack(alignment: .topLeading) {
-            // Black island shape
+            // Apple Cyberpunk / Dark Glass Island foundation
             IslandShape(width: islandWidth, height: islandHeight,
                         cornerRadius: cornerRadius, topRadius: islandTopRadius)
-                .fill(Color.black)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#0C0E15"), Color(hex: "#06070A")],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .overlay(
+                    IslandShape(width: islandWidth, height: islandHeight,
+                                cornerRadius: cornerRadius, topRadius: islandTopRadius)
+                        .stroke(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: Color.white.opacity(0.18), location: 0),
+                                    .init(color: Color(hex: "#38BDF8").opacity(0.15), location: 0.3),
+                                    .init(color: Color(hex: "#818CF8").opacity(0.10), location: 0.7),
+                                    .init(color: Color.white.opacity(0.04), location: 1.0)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: Color(hex: "#2563EB").opacity(state.mode == .expanded ? 0.22 : 0.05), radius: 24, x: 0, y: 8)
 
             // Content
             if state.mode == .expanded {
-                if greetingActive {
-                    // Greeting canvas: fixed 640-wide, centered by offset so x=320 aligns with island center
-                    GreetingCanvasView(state: state)
-                        .frame(width: IslandConst.expandedWidth, height: 150)
-                        .offset(x: (islandWidth - IslandConst.expandedWidth) / 2)
-                        .clipShape(IslandShape(width: islandWidth, height: islandHeight,
-                                              cornerRadius: cornerRadius, topRadius: islandTopRadius))
-                        .transition(.opacity)
-                } else if uploadActive {
+                if uploadActive {
                     ZStack(alignment: .topLeading) {
                         UploadCanvasView(state: state)
                             .frame(width: islandWidth, height: islandHeight)
@@ -77,13 +93,13 @@ struct IslandContainer: View {
                         // Header overlaid: canvas CARD_Y=42 aligns exactly with header bottom,
                         // matching normal view proportions (8pt top + 34pt header + card + 10pt bottom).
                         IslandHeader(state: state)
-                            .frame(width: islandWidth, height: 34)
-                            .offset(y: 8)
+                            .frame(width: islandWidth, height: 28)
+                            .offset(y: 10)
                     }
                     .transition(.opacity)
                 } else {
                     IslandContentView(state: state)
-                        .frame(width: islandWidth, height: islandHeight - earOffset)
+                        .frame(width: islandWidth, height: islandHeight - earOffset, alignment: .top)
                         .offset(y: earOffset)
                         .clipShape(IslandShape(width: islandWidth, height: islandHeight,
                                               cornerRadius: cornerRadius, topRadius: islandTopRadius))
@@ -91,25 +107,32 @@ struct IslandContainer: View {
                 }
             }
 
-            // Single BotPlacement — always alive in the view tree so spring animations
-            // fire from the current position (e.g. choose at 60,101) when canvas deactivates.
-            // Hidden during upload canvas or greeting (both draw their own Mochi).
+            // Single BotPlacement — always alive in the view tree
             BotPlacement(state: state, islandW: islandWidth, islandH: islandHeight)
-                .opacity(uploadActive || greetingActive ? 0 : 1)
-                .animation(.easeInOut(duration: 0.25), value: uploadActive || greetingActive)
+                .opacity(uploadActive ? 0 : 1)
+                .animation(.easeInOut(duration: 0.25), value: uploadActive)
 
             CountdownBar(state: state, islandW: islandWidth)
 
             Group {
                 if state.mode == .compact {
                     CompactMiniGrid(state: state)
-                        .position(x: islandWidth - 40, y: islandHeight / 2)
+                        .position(x: 24, y: islandHeight / 2)
                         .transition(.opacity)
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: state.mode == .compact)
         }
         .frame(width: islandWidth, height: islandHeight, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if state.mode != .expanded {
+                SoundEngine.shared.play("open")
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) {
+                    NotificationCenter.default.post(name: .hookExpand, object: IslandView.overview)
+                }
+            }
+        }
         .onChange(of: state.mode) { oldMode, newMode in
             let shrinking = modeOrder(newMode) < modeOrder(oldMode)
             let anim = shrinking ? closeEase : openSpring
@@ -243,124 +266,125 @@ struct IslandShape: Shape {
     }
 }
 
-// MARK: - Bot placement helper
+// MARK: - Bot placement helper (Gemini 3D Glowing Core with Thinking Patrol Orbit)
 
 struct BotPlacement: View {
     @ObservedObject var state: AppState
     let islandW: CGFloat
     let islandH: CGFloat
 
+    @State private var thinkingStartTime: Date? = nil
+    @State private var lastSighTime: Date = .distantPast
+
+    private var isThinking: Bool {
+        state.effectiveState == .thinking || state.stateOverride == .thinking
+    }
+
     var body: some View {
-        let (cx, cy, diameter, opacity) = botPosition(mode: state.mode, view: state.view, islandW: islandW, islandH: islandH, uploadProgress: state.uploadProgress)
-        let canvasSize = diameter / 0.6
-        let overhang: CGFloat = 40
-        let isUploading = state.view == .uploading
+        TimelineView(.animation(paused: !isThinking)) { timeline in
+            let (targetX, targetY, diameter, opacity) = computePosition()
 
-        Group {
-            // No glow in uploading mode — the tiny dot doesn't need it
-            if state.mode == .expanded && !isUploading {
-                Circle()
-                    .fill(RadialGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: botGlowColor(state.effectiveState), location: 0),
-                            .init(color: .clear, location: 0.62)
-                        ]),
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: diameter * 1.1
-                    ))
-                    .frame(width: diameter * 2.2, height: diameter * 2.2)
-                    .blur(radius: 6)
-                    .opacity(botGlowOpacity(state.effectiveState))
-                    .position(x: cx, y: cy)
-                    .animation(.easeInOut(duration: 0.4), value: state.effectiveState)
-            }
-
-            // Uploading: no particle overhang (no hearts during upload), positioned directly at cy.
-            // BotEngine cy = H/2 + 0 + oy*R + R*0.06 ≈ H/2 (body centered in canvas).
-            // With .position(x:y:) placing the frame center at (uploadCx, cy), bot is at cy ✓.
-            //
-            // Normal: extra 40pt canvas at top for heart particles; position offset up by 20pt;
-            // BotEngine compensates with cy = H/2 + particleOverhang/2 + oy*R + R*0.06.
-            if isUploading {
-                TimelineView(.animation) { tl in
-                    let elapsed: Double = {
-                        guard let start = state.uploadStartTime else { return 0 }
-                        return tl.date.timeIntervalSince(start)
-                    }()
-                    let t = min(1.0, max(0, elapsed / state.uploadDuration))
-                    // cx = 36 + 526*t: bot center at fill right edge (bar left=36, width=526)
-                    let uploadCx = 36 + CGFloat(t * (2 - t)) * 526
-                    BotCanvasView(state: state, particleOverhang: 0)
-                        .frame(width: canvasSize, height: canvasSize)
-                        .opacity(state.isDraggingBot ? 0 : opacity)
-                        .position(x: uploadCx, y: cy)
+            ZStack {
+                // When thinking: Stardust particles glowing behind the star
+                if isThinking {
+                    ThinkingStardustTrail(centerX: targetX, centerY: targetY, diameter: diameter)
                 }
-                .transition(.scale(scale: 0.01, anchor: .center).combined(with: .opacity))
-            } else {
-                BotCanvasView(state: state, particleOverhang: overhang)
-                    .frame(width: canvasSize, height: canvasSize + overhang)
+
+                GeminiCoreView(state: state, diameter: diameter)
                     .opacity(state.isDraggingBot ? 0 : opacity)
-                    .position(x: cx, y: cy - overhang / 2)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.72), value: cx)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.72), value: cy)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.72), value: canvasSize)
-                    .transition(.scale(scale: 0.01, anchor: .center).combined(with: .opacity))
+                    .position(x: targetX, y: targetY)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.7), value: state.isPeekingUp)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.72), value: isThinking)
+                    .allowsHitTesting(false)
+            }
+            .onChange(of: isThinking) { _, thinking in
+                if thinking {
+                    thinkingStartTime = Date()
+                } else {
+                    thinkingStartTime = nil
+                    state.isSighing = false
+                }
+            }
+            .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
+                checkSigh()
             }
         }
-        // Branch switch (uploading ↔ normal) animates with a fast spring: uploading dot
-        // scales out at bar-end while normal bot scales in at choose position.
-        .animation(.spring(response: 0.36, dampingFraction: 0.72), value: isUploading)
-        // Slap, drag, and hover are handled by the AppKit NSEvent monitor in
-        // IslandWindowController — not SwiftUI gestures — so this is safe.
-        .allowsHitTesting(false)
     }
 
-    private func botGlowColor(_ s: BotState) -> Color {
-        switch s {
-        case .working:   return Color(hex: "#3B9EFF")
-        case .thinking:  return Color(hex: "#A78BFA")
-        case .searching: return Color(hex: "#6366F1")
-        case .approval:  return Color(hex: "#F5A524")
-        case .error:     return Color(hex: "#F4505E")
-        case .finished:  return Color(hex: "#34D399")
-        case .ratelimit: return Color(hex: "#F59E0B")
-        default:         return Color.white
+    private func checkSigh() {
+        guard isThinking, let start = thinkingStartTime else { return }
+        let elapsed = Date().timeIntervalSince(start)
+        // If thinking takes longer than 8.5 seconds and hasn't sighed in the last 12 seconds
+        if elapsed >= 8.5 && Date().timeIntervalSince(lastSighTime) >= 12.0 {
+            lastSighTime = Date()
+            state.isSighing = true
+            SoundEngine.shared.play("yawn")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                if self.isThinking {
+                    self.state.isSighing = false
+                }
+            }
         }
     }
 
-    private func botGlowOpacity(_ s: BotState) -> Double {
-        switch s {
-        case .idle, .sleeping: return 0.15
-        case .dizzy:           return 0.0
-        default:               return 0.65
+    private func computePosition() -> (CGFloat, CGFloat, CGFloat, Double) {
+        return botPosition(
+            mode: state.mode, view: state.view,
+            islandW: islandW, islandH: islandH,
+            uploadProgress: state.uploadProgress, notchH: state.notchHeight,
+            isPeekingUp: state.isPeekingUp
+        )
+    }
+}
+
+struct ThinkingStardustTrail: View {
+    let centerX: CGFloat
+    let centerY: CGFloat
+    let diameter: CGFloat
+
+    var body: some View {
+        ZStack {
+            ForEach(1...3, id: \.self) { i in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color(hex: "#C084FC").opacity(0.35 / Double(i)), Color.clear],
+                            center: .center,
+                            startRadius: 1,
+                            endRadius: diameter * 0.75
+                        )
+                    )
+                    .frame(width: diameter * 1.5, height: diameter * 1.5)
+                    .position(x: centerX, y: centerY)
+                    .scaleEffect(1.0 + CGFloat(i) * 0.15)
+            }
         }
     }
 }
 
-func botPosition(mode: IslandMode, view: IslandView, islandW: CGFloat, islandH: CGFloat, uploadProgress: Double) -> (CGFloat, CGFloat, CGFloat, Double) {
+func botPosition(mode: IslandMode, view: IslandView, islandW: CGFloat, islandH: CGFloat, uploadProgress: Double, notchH: CGFloat = IslandConst.notchHeight, isPeekingUp: Bool = false) -> (CGFloat, CGFloat, CGFloat, Double) {
     switch mode {
-    case .hidden:   return (46, 16, 6, 0)
-    case .compact:  return (40, 16, 20, 1)
+    case .hidden:
+        return (islandW - 20, 16, 6, 0)
+    case .compact:
+        let cx = islandW - 20
+        let cy: CGFloat = isPeekingUp ? 18 : 14
+        return (cx, cy, 22, 1)
     case .expanded:
         let layout = IslandConst.viewLayouts[view]!
         let diameter = layout.botDiameter
-        // Uploading: Mochi dot rides the leading edge of the progress fill.
-        // Bar in island coords: left=36, width=526. cx = 36 + progress*526 (dot center at fill right edge).
-        // cy comes from ViewLayout.botY (bar center in island coords).
         if view == .uploading {
             let cx = 36 + CGFloat(uploadProgress) * 526
-            return (cx, layout.botY ?? 103, diameter, 1)
+            return (cx, layout.botY ?? 110, diameter, 1)
         }
         let cx = layout.botX
         let cy: CGFloat
         if let fixedY = layout.botY {
             cy = fixedY
         } else {
-            // Center of the fixed 84pt card (VStack top=8, header=34 → content starts at y=42)
-            let headerBottom: CGFloat = 42
-            let cardH: CGFloat = 84
-            cy = headerBottom + (islandH - headerBottom - cardH) / 2 + cardH / 2
+            let cardTop: CGFloat = 10 + 28 + 8
+            let cardH: CGFloat = 104
+            cy = cardTop + cardH / 2
         }
         return (cx, cy, diameter, 1)
     }
@@ -420,25 +444,22 @@ struct IslandContentView: View {
     @ObservedObject var state: AppState
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 8) {
             IslandHeader(state: state)
-                .frame(height: 34)
-                .opacity(state.view == .confused ? 0 : 1)
-                .animation(.easeInOut(duration: 0.2), value: state.view == .confused)
+                .frame(height: 28)
+                .opacity((state.view == .confused || state.view == .greeting) ? 0 : 1)
+                .animation(.easeInOut(duration: 0.2), value: state.view)
 
-            ZStack {
+            ZStack(alignment: .top) {
                 ForEach(IslandView.allCases, id: \.self) { v in
                     let active = state.view == v
-                    // Views that fill available height instead of the fixed 98pt content frame:
-                    // chat (prompt) is always flexible; mail is flexible only when active so
-                    // it doesn't push the ZStack taller when inactive.
-                    let isTall = v == .prompt || (v == .mail && active)
+                    let isTall = active && (v == .prompt || v == .mail)
                     let anim: Animation = active
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)
                     IslandViewContent(view: v, state: state)
                         .frame(maxWidth: .infinity)
-                        .frame(height: isTall ? nil : 98)
+                        .frame(height: isTall ? nil : 104)
                         .frame(maxHeight: isTall ? .infinity : nil)
                         .opacity(active ? 1 : 0)
                         .scaleEffect(active ? 1 : 0.97)
@@ -446,11 +467,11 @@ struct IslandContentView: View {
                         .animation(anim, value: state.view)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, 10)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 10)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
         .foregroundColor(Color(hex: "#F5F6F8"))
     }
 }
@@ -463,23 +484,22 @@ struct IslandHeader: View {
     var body: some View {
         HStack(spacing: 0) {
             // Left: tab capsules
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 TabButton(icon: "house.fill", view: .overview, state: state)
-                TabButton(icon: "bubble.left.fill", view: .prompt, state: state, preAction: {
+                TabButton(icon: "bubble.left.and.bubble.right.fill", view: .prompt, state: state, preAction: {
                     #if !APPSTORE
                     if state.promptContext == nil {
                         state.promptContext = WindowContextCapture.captureActive(from: state.lastExternalApp)
                     }
                     #endif
                 })
-                TabButton(icon: "plus", view: .upload, state: state)
             }
             .padding(.leading, 14)
 
             Spacer()
 
             // Right: action icons
-            HStack(spacing: 14) {
+            HStack(spacing: 10) {
                 Button(action: {
                     state.lastActivity = .now
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -487,8 +507,12 @@ struct IslandHeader: View {
                     }
                 }) {
                     Image(systemName: state.view == .settings ? "gearshape.fill" : "gearshape")
-                        .font(.system(size: 14))
-                        .foregroundColor(state.view == .settings ? Color(hex: "#F5F6F8") : Color(hex: "#8E939C"))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(state.view == .settings ? Color(hex: "#38BDF8") : Color(hex: "#8E939C"))
+                        .frame(width: 26, height: 26)
+                        .background(state.view == .settings ? Color(hex: "#38BDF8").opacity(0.15) : Color.white.opacity(0.04))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(state.view == .settings ? Color(hex: "#38BDF8").opacity(0.3) : Color.clear, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
 
@@ -496,9 +520,12 @@ struct IslandHeader: View {
                     state.lastActivity = .now
                     state.soundEnabled.toggle()
                 }) {
-                    Image(systemName: state.soundEnabled ? "speaker.wave.2" : "speaker.slash")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(hex: "#8E939C"))
+                    Image(systemName: state.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(state.soundEnabled ? Color(hex: "#818CF8") : Color(hex: "#6B7280"))
+                        .frame(width: 26, height: 26)
+                        .background(Color.white.opacity(0.04))
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -530,14 +557,31 @@ struct TabButton: View {
             }
         }) {
             Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundColor(isOn ? Color(hex: "#F5F6F8") : (isHovered ? Color(hex: "#B0B5BE") : Color(hex: "#8E939C")))
-                .frame(width: 30, height: 22)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(isOn ? Color.white : (isHovered ? Color(hex: "#E2E8F0") : Color(hex: "#8E939C")))
+                .frame(width: 32, height: 24)
                 .background(
-                    isOn ? Color(hex: "#1D1F23") :
-                    isHovered ? Color.white.opacity(0.07) : Color.clear
+                    ZStack {
+                        if isOn {
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "#2563EB").opacity(0.4), Color(hex: "#4F46E5").opacity(0.3)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            Capsule()
+                                .stroke(Color(hex: "#38BDF8").opacity(0.45), lineWidth: 1)
+                        } else if isHovered {
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                        }
+                    }
                 )
                 .clipShape(Capsule())
+                .scaleEffect(isHovered ? 1.05 : 1.0)
+                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovered)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
@@ -554,15 +598,19 @@ struct CompactMiniGrid: View {
     }
 
     var body: some View {
-        let cols = [GridItem(.fixed(12), spacing: 4), GridItem(.fixed(12), spacing: 4)]
-        LazyVGrid(columns: cols, spacing: 4) {
-            ForEach(others) { task in
-                MiniBotCanvasView(task: task)
-                    .frame(width: 12 / 0.6, height: 12 / 0.6)
-                    .frame(width: 12, height: 12, alignment: .center)
+        if others.isEmpty {
+            EmptyView()
+        } else {
+            let cols = [GridItem(.fixed(12), spacing: 4), GridItem(.fixed(12), spacing: 4)]
+            LazyVGrid(columns: cols, spacing: 4) {
+                ForEach(others) { task in
+                    Circle()
+                        .fill(Color(hex: task.color))
+                        .frame(width: 6, height: 6)
+                }
             }
+            .frame(width: 28, height: 28)
         }
-        .frame(width: 28, height: 28)
     }
 }
 

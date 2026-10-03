@@ -28,7 +28,7 @@ enum BotEmote: String, CaseIterable {
     case love, surprised, proud, wink, yawn, happy, annoyed
 }
 
-// MARK: - Approval info (pending PermissionRequest from Claude Code)
+// MARK: - Approval info (pending PermissionRequest from Antigravity / Agent)
 
 struct ApprovalInfo: Sendable {
     var sessionId: String
@@ -54,12 +54,12 @@ struct AgentTask: Identifiable, Equatable {
     var emote: BotEmote? = nil
     var miniEye: EyeShape? = nil
     var pillBadge: PillBadge? = nil  // alert badge shown on pill when not focused
-    var sessionCwd: String?  = nil  // last known working directory (Claude Code sessions)
+    var sessionCwd: String?  = nil  // last known working directory (Agent sessions)
 }
 
 enum AgentSource: Equatable {
     case antigravity
-    case claudeCode
+    case gemini
     case n8n
 }
 
@@ -88,26 +88,23 @@ enum IslandConst {
     static let expandedCorner: CGFloat = 22
 
     static let viewLayouts: [IslandView: ViewLayout] = [
-        // Home is the reference: height 150
-        .overview:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .pills),
-        // All non-chat views match home height (150) — law
-        .empty:     ViewLayout(height: 160, botX: 70,  botY: nil, botDiameter: 62, agentMode: .none),
-        .approval:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
-        .question:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
-        .error:     ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 58, agentMode: .column),
-        .finished:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 58, agentMode: .column),
-        .confused:  ViewLayout(height: 160, botX: 76,  botY: nil, botDiameter: 66, agentMode: .column),
-        .upload:    ViewLayout(height: 176, botX: 140, botY: 104, botDiameter: 62, agentMode: .column),
-        .uploading: ViewLayout(height: 176, botX: 46,  botY: 118, botDiameter: 20, agentMode: .none),
-        .choose:    ViewLayout(height: 176, botX: 60,  botY: 101, botDiameter: 52, agentMode: .column),
-        .mail:      ViewLayout(height: 240, botX: 56,  botY: nil, botDiameter: 46, agentMode: .column),
-        .prompt:    ViewLayout(height: 160, botX: 52,  botY: nil, botDiameter: 44, agentMode: .column),
-        .searching: ViewLayout(height: 160, botX: 52,  botY: nil, botDiameter: 44, agentMode: .column),
-        .result:    ViewLayout(height: 160, botX: 52,  botY: nil, botDiameter: 44, agentMode: .column),
-        .note:      ViewLayout(height: 160, botX: 60,  botY: nil, botDiameter: 50, agentMode: .column),
-        .settings:  ViewLayout(height: 160, botX: 54,  botY: nil, botDiameter: 46, agentMode: .none),
-        // Greeting: bot drawn by GreetingCanvasView; no BotPlacement needed
-        .greeting:  ViewLayout(height: 150, botX: 320, botY: 90,  botDiameter: 0,  agentMode: .none),
+        .overview:  ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 48, agentMode: .none),
+        .empty:     ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 52, agentMode: .none),
+        .approval:  ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 48, agentMode: .column),
+        .question:  ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 48, agentMode: .column),
+        .error:     ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 48, agentMode: .column),
+        .finished:  ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 48, agentMode: .column),
+        .confused:  ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 48, agentMode: .column),
+        .upload:    ViewLayout(height: 196, botX: 140, botY: 110, botDiameter: 56, agentMode: .column),
+        .uploading: ViewLayout(height: 196, botX: 46,  botY: 124, botDiameter: 20, agentMode: .none),
+        .choose:    ViewLayout(height: 196, botX: 60,  botY: 110, botDiameter: 48, agentMode: .column),
+        .mail:      ViewLayout(height: 250, botX: 56,  botY: nil, botDiameter: 44, agentMode: .column),
+        .prompt:    ViewLayout(height: 186, botX: 52,  botY: nil, botDiameter: 42, agentMode: .column),
+        .searching: ViewLayout(height: 172, botX: 52,  botY: nil, botDiameter: 42, agentMode: .column),
+        .result:    ViewLayout(height: 172, botX: 52,  botY: nil, botDiameter: 42, agentMode: .column),
+        .note:      ViewLayout(height: 172, botX: 60,  botY: nil, botDiameter: 46, agentMode: .column),
+        .settings:  ViewLayout(height: 172, botX: 54,  botY: nil, botDiameter: 44, agentMode: .none),
+        .greeting:  ViewLayout(height: 172, botX: 68,  botY: nil, botDiameter: 48, agentMode: .none),
     ]
 
     // Project colors — keyed by lowercase display name or slug
@@ -133,13 +130,7 @@ enum IslandConst {
         let color: String
     }
     static let allIntegrations: [IntegrationMeta] = [
-        .init(id: "integration_resend",  name: "Resend",  color: "#22C55E"),
-        .init(id: "integration_n8n",     name: "n8n",     color: "#F29B38"),
-        .init(id: "integration_vercel",  name: "Vercel",  color: "#7C5CFF"),
-        .init(id: "integration_github",  name: "GitHub",  color: "#F4505E"),
-        .init(id: "integration_notion",  name: "Notion",  color: "#8C8C8C"),
-        .init(id: "integration_calcom",  name: "Cal.com", color: "#C9956A"),
-        .init(id: "integration_stripe",  name: "Stripe",  color: "#0570DE"),
+        .init(id: "integration_gemini", name: "Antigravity", color: "#4285F4"),
     ]
 
     /// Returns the fixed project color for a display name, or a stable fallback.

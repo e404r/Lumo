@@ -27,7 +27,7 @@ struct BotCanvasView: View {
                     if engine.morph < 0.05 { engine.slotH = 0; engine.slotHVel = 0 }
                 }
                 // Integration pills have a fixed brand color → use it as bodyColor.
-                // Claude Code tasks use state-based gradient (working=blue, thinking=purple, etc.).
+                // Antigravity & custom agent tasks use state-based gradient (working=blue, thinking=purple, etc.).
                 engine.bodyColor = (state.focusTask?.isIntegration == true)
                     ? cgColorFromHex(state.focusTask!.color)
                     : nil
@@ -108,7 +108,7 @@ struct BotCanvasView: View {
                                              progress: state.uploadProgress,
                                              nw: state.notchWidth, nh: state.notchHeight)
         let actualH: CGFloat = (state.mode == .expanded && state.view == .prompt)
-            ? min(300, 240 + CGFloat(state.chatHistory.count) * 40)
+            ? min(340, 260 + CGFloat(state.chatHistory.count) * 40)
             : islandH
         let (_, botCy, _, _) = botPosition(mode: state.mode, view: state.view,
                                              islandW: islandW, islandH: actualH,

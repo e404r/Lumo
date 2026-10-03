@@ -2,26 +2,15 @@ import Foundation
 import SwiftUI
 import Combine
 
-// Integration pills — always-present, never purged
+// Integration pills — Antigravity HUD
 extension AgentTask {
-    /// All available integration pills. Claude is always active; others are opt-in (max 4).
+    /// Dedicated Antigravity HUD agent task.
     static let integrationAgents: [AgentTask] = [
-        AgentTask(id: "integration_claude",  name: "Antigravity", color: "#4285F4", state: .idle, steps: [], source: .antigravity, isIntegration: true),
-        AgentTask(id: "integration_resend",  name: "Resend",    color: "#22C55E", state: .idle, steps: [], source: .n8n, isIntegration: true),
-        AgentTask(id: "integration_n8n",     name: "n8n",       color: "#F29B38", state: .idle, steps: [], source: .n8n, isIntegration: true),
-        AgentTask(id: "integration_vercel",  name: "Vercel",    color: "#7C5CFF", state: .idle, steps: [], source: .n8n, isIntegration: true),
-        AgentTask(id: "integration_github",  name: "GitHub",    color: "#F4505E", state: .idle, steps: [], source: .n8n, isIntegration: true),
-        AgentTask(id: "integration_notion",  name: "Notion",    color: "#8C8C8C", state: .idle, steps: [], source: .n8n, isIntegration: true),
-        AgentTask(id: "integration_calcom",  name: "Cal.com",   color: "#C9956A", state: .idle, steps: [], source: .n8n, isIntegration: true),
-        AgentTask(id: "integration_stripe",  name: "Stripe",    color: "#0570DE", state: .idle, steps: [], source: .n8n, isIntegration: true),
+        AgentTask(id: "integration_gemini", name: "Antigravity", color: "#4285F4", state: .idle, steps: [], source: .antigravity, isIntegration: true),
     ]
 
-    /// IDs that can be toggled (VS Code is always on and excluded from this list)
-    static let toggleableIntegrationIds: [String] = [
-        "integration_resend", "integration_n8n", "integration_vercel", "integration_github",
-        "integration_notion", "integration_calcom", "integration_stripe",
-    ]
-
+    /// No external toggleable integrations
+    static let toggleableIntegrationIds: [String] = []
 }
 
 @MainActor
@@ -58,6 +47,13 @@ final class AppState: ObservableObject {
     // Pinned (alerts that stay open, never auto-close)
     var isPinned: Bool = false
 
+    // Long thinking sigh state
+    @Published var isSighing: Bool = false
+
+    // Star Peeking and Hand Wave interaction state
+    @Published var isPeekingUp: Bool = false
+    @Published var isStarWaving: Bool = false
+
     // Upload progress (0-1) — set to 1.0 only at completion; animation is time-based
     @Published var uploadProgress: Double = 0
 
@@ -81,8 +77,45 @@ final class AppState: ObservableObject {
         }
     }
 
+    // Active Model & Reasoning for Antigravity CLI (`agy`)
+    @Published var selectedModel: String = UserDefaults.standard.string(forKey: "lumo_selected_model") ?? "gemini-3.8-flash-high" {
+        didSet {
+            UserDefaults.standard.set(selectedModel, forKey: "lumo_selected_model")
+            if let idx = chatSessions.firstIndex(where: { $0.id == activeSessionId }) {
+                chatSessions[idx].model = selectedModel
+            }
+        }
+    }
+
+    @Published var selectedEffort: String = {
+        let v = UserDefaults.standard.string(forKey: "lumo_selected_effort") ?? "high"
+        return v == "max" ? "high" : v
+    }() {
+        didSet {
+            let sanitized = (selectedEffort == "max") ? "high" : selectedEffort
+            if selectedEffort != sanitized {
+                selectedEffort = sanitized
+                return
+            }
+            UserDefaults.standard.set(selectedEffort, forKey: "lumo_selected_effort")
+            if let idx = chatSessions.firstIndex(where: { $0.id == activeSessionId }) {
+                chatSessions[idx].effort = selectedEffort
+            }
+        }
+    }
+
+    var currentModelOption: AIModelOption {
+        AIModelOption.find(selectedModel)
+    }
+
     // Context for prompt (window attach / file)
-    @Published var promptContext: PromptContext? = nil
+    @Published var promptContext: PromptContext? = nil {
+        didSet {
+            if let idx = chatSessions.firstIndex(where: { $0.id == activeSessionId }) {
+                chatSessions[idx].promptContext = promptContext
+            }
+        }
+    }
 
     // Dropped file (set during upload flow)
     @Published var droppedFile: DroppedFile? = nil
@@ -134,8 +167,8 @@ final class AppState: ObservableObject {
         }
     }
 
-    // Active integration pills (VS Code excluded — always on). Max 4.
-    @Published var activeIntegrations: Set<String> = ["integration_resend", "integration_n8n", "integration_vercel", "integration_github"] {
+    // Active integration pills. Antigravity HUD is the dedicated integration.
+    @Published var activeIntegrations: Set<String> = ["integration_gemini"] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(activeIntegrations)) {
                 UserDefaults.standard.set(data, forKey: "activeIntegrations")
@@ -177,7 +210,105 @@ final class AppState: ObservableObject {
     // Chat conversation history
     @Published var chatHistory: [ChatMessage] = []
 
-    // Pending approval request from Claude Code hook
+    // Multi-Agent Chat Sessions (Tabs)
+    @Published var chatSessions: [ChatSession] = [
+        ChatSession(
+            id: UUID(),
+            title: "Chat 1",
+            model: UserDefaults.standard.string(forKey: "lumo_selected_model") ?? "gemini-3.8-flash-high",
+            effort: UserDefaults.standard.string(forKey: "lumo_selected_effort") ?? "high",
+            history: []
+        )
+    ]
+    @Published var activeSessionId: UUID = UUID()
+
+    var activeSession: ChatSession {
+        get {
+            chatSessions.first(where: { $0.id == activeSessionId }) ?? chatSessions[0]
+        }
+        set {
+            if let idx = chatSessions.firstIndex(where: { $0.id == activeSessionId }) {
+                chatSessions[idx] = newValue
+                chatHistory = newValue.history
+            }
+        }
+    }
+
+    func switchSession(id: UUID) {
+        if let currentIdx = chatSessions.firstIndex(where: { $0.id == activeSessionId }) {
+            chatSessions[currentIdx].promptContext = promptContext
+        }
+        guard let session = chatSessions.first(where: { $0.id == id }) else { return }
+        activeSessionId = id
+        selectedModel = session.model
+        selectedEffort = session.effort
+        chatHistory = session.history
+        promptContext = session.promptContext
+        let anyThinking = chatSessions.contains { $0.isThinking }
+        stateOverride = anyThinking ? .thinking : nil
+        SoundEngine.shared.play("blip")
+    }
+
+    func newChatSession(model: String? = nil) {
+        let chosenModel = model ?? selectedModel
+        let chosenEffort = selectedEffort
+        let option = AIModelOption.find(chosenModel)
+        let count = chatSessions.count + 1
+        let title = "\(option.name.components(separatedBy: " ").first ?? "Chat") \(count)"
+        let newSession = ChatSession(
+            id: UUID(),
+            title: title,
+            model: chosenModel,
+            effort: chosenEffort,
+            history: []
+        )
+        chatSessions.append(newSession)
+        switchSession(id: newSession.id)
+    }
+
+    func closeChatSession(id: UUID) {
+        guard chatSessions.count > 1 else {
+            if let idx = chatSessions.firstIndex(where: { $0.id == id }) {
+                chatSessions[idx].history.removeAll()
+                chatHistory.removeAll()
+            }
+            return
+        }
+        if activeSessionId == id {
+            if let idx = chatSessions.firstIndex(where: { $0.id == id }) {
+                let nextIdx = idx > 0 ? idx - 1 : 1
+                let nextSession = chatSessions[nextIdx]
+                activeSessionId = nextSession.id
+                selectedModel = nextSession.model
+                selectedEffort = nextSession.effort
+                chatHistory = nextSession.history
+                promptContext = nextSession.promptContext
+            }
+        }
+        chatSessions.removeAll(where: { $0.id == id })
+        let anyThinking = chatSessions.contains { $0.isThinking }
+        stateOverride = anyThinking ? .thinking : nil
+        SoundEngine.shared.play("pop")
+    }
+
+    func appendMessage(to sessionId: UUID, message: ChatMessage) {
+        if let idx = chatSessions.firstIndex(where: { $0.id == sessionId }) {
+            chatSessions[idx].history.append(message)
+            if activeSessionId == sessionId {
+                chatHistory = chatSessions[idx].history
+            }
+        }
+    }
+
+    func setSessionThinking(sessionId: UUID, thinking: Bool) {
+        if let idx = chatSessions.firstIndex(where: { $0.id == sessionId }) {
+            chatSessions[idx].isThinking = thinking
+        }
+        let anyThinking = chatSessions.contains { $0.isThinking }
+        stateOverride = anyThinking ? .thinking : nil
+    }
+
+    // Pending approval request from Agent hook
     @Published var pendingApproval: ApprovalInfo? = nil
 
     // MARK: - Init (loads persisted settings)
@@ -201,10 +332,22 @@ final class AppState: ObservableObject {
         if let d = ud.data(forKey: "n8nWorkflowFilter"),
            let a = try? JSONDecoder().decode([String].self, from: d) { n8nWorkflowFilter = Set(a) }
         if let d = ud.data(forKey: "activeIntegrations"),
-           let a = try? JSONDecoder().decode([String].self, from: d) { activeIntegrations = Set(a) }
+           let a = try? JSONDecoder().decode([String].self, from: d) {
+            var set = Set(a)
+            if set.contains("integration_claude") {
+                set.remove("integration_claude")
+                set.insert("integration_gemini")
+            }
+            activeIntegrations = set
+        }
 
         // Sync SoundEngine volume on launch
         SoundEngine.shared.volume = Float(soundVolume)
+
+        // Ensure active session ID is initialized
+        if let first = chatSessions.first {
+            activeSessionId = first.id
+        }
 
         // Always load integration pills
         loadIntegrationTasks()
@@ -263,25 +406,25 @@ final class AppState: ObservableObject {
         else if view == .overview && tasks.isEmpty { view = .empty }
     }
 
-    /// Load integration pills respecting activeIntegrations. VS Code always loads. Safe to call multiple times.
+    /// Load integration pills respecting activeIntegrations. Antigravity HUD always loads. Safe to call multiple times.
     func loadIntegrationTasks() {
         for task in AgentTask.integrationAgents {
-            let shouldLoad = task.id == "integration_claude" || activeIntegrations.contains(task.id)
+            let shouldLoad = task.id == "integration_gemini" || activeIntegrations.contains(task.id)
             let loaded = tasks.contains(where: { $0.id == task.id })
             if shouldLoad && !loaded { tasks.append(task) }
             if !shouldLoad && loaded { tasks.removeAll { $0.id == task.id } }
         }
-        if focusId == nil { focusId = "integration_claude" }
+        if focusId == nil { focusId = "integration_gemini" }
         syncMode()
     }
 
-    /// Toggle an integration pill on/off. VS Code cannot be toggled. Max 4 active at once.
+    /// Toggle an integration pill on/off. Antigravity HUD cannot be toggled. Max 4 active at once.
     func toggleIntegration(_ id: String) {
-        guard id != "integration_claude" else { return }
+        guard id != "integration_gemini" else { return }
         if activeIntegrations.contains(id) {
             activeIntegrations.remove(id)
             tasks.removeAll { $0.id == id }
-            if focusId == id { focusId = "integration_claude" }
+            if focusId == id { focusId = "integration_gemini" }
         } else {
             guard activeIntegrations.count < 4 else { return }
             activeIntegrations.insert(id)
@@ -434,10 +577,108 @@ struct NotionPage: Identifiable {
 
 // MARK: - Chat
 
-enum ChatRole { case user, assistant }
+enum ChatRole: Equatable { case user, assistant }
 
-struct ChatMessage: Identifiable {
-    let id = UUID()
+struct ChatMessage: Identifiable, Equatable {
+    let id: UUID
     let role: ChatRole
     let content: String
+
+    init(id: UUID = UUID(), role: ChatRole, content: String) {
+        self.id = id
+        self.role = role
+        self.content = content
+    }
+}
+
+// MARK: - Multi-Agent Chat Session (Tabs)
+
+struct ChatSession: Identifiable, Equatable {
+    let id: UUID
+    var title: String
+    var model: String
+    var effort: String
+    var history: [ChatMessage]
+    var isThinking: Bool = false
+    var promptContext: PromptContext?
+    var createdAt: Date = Date()
+
+    var modelOption: AIModelOption {
+        AIModelOption.find(model)
+    }
+
+    static func == (lhs: ChatSession, rhs: ChatSession) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.title == rhs.title &&
+        lhs.model == rhs.model &&
+        lhs.effort == rhs.effort &&
+        lhs.history == rhs.history &&
+        lhs.isThinking == rhs.isThinking
+    }
+}
+
+// MARK: - AI Models Supported by Antigravity
+
+struct AIModelOption: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let subtitle: String
+    let provider: String
+    let icon: String
+    let tagColor: String
+
+    static let allModels: [AIModelOption] = [
+        AIModelOption(
+            id: "gemini-3.8-flash-high",
+            name: "Gemini 3.8 Flash",
+            subtitle: "Lightning fast · High reasoning",
+            provider: "Google",
+            icon: "sparkles",
+            tagColor: "#38BDF8"
+        ),
+        AIModelOption(
+            id: "gemini-3.1-pro-high",
+            name: "Gemini 3.1 Pro",
+            subtitle: "Deep code analysis & complex tasks",
+            provider: "Google",
+            icon: "brain.head.profile",
+            tagColor: "#818CF8"
+        ),
+        AIModelOption(
+            id: "claude-sonnet-4-6",
+            name: "Claude Sonnet 4.6",
+            subtitle: "Balanced thinking & creative coding",
+            provider: "Anthropic",
+            icon: "cpu",
+            tagColor: "#F59E0B"
+        ),
+        AIModelOption(
+            id: "claude-opus-4-6-thinking",
+            name: "Claude Opus 4.6",
+            subtitle: "Deepest architectural reasoning",
+            provider: "Anthropic",
+            icon: "crown.fill",
+            tagColor: "#EC4899"
+        ),
+        AIModelOption(
+            id: "gemini-3.7-flash-high",
+            name: "Gemini 3.7 Flash",
+            subtitle: "Ultra responsive companion",
+            provider: "Google",
+            icon: "bolt.fill",
+            tagColor: "#10B981"
+        ),
+        AIModelOption(
+            id: "gpt-oss-120b-medium",
+            name: "GPT-OSS 120B",
+            subtitle: "Open-weights powerhouse",
+            provider: "OSS",
+            icon: "cube.fill",
+            tagColor: "#A855F7"
+        )
+    ]
+
+    static func find(_ id: String) -> AIModelOption {
+        allModels.first { $0.id == id } ?? allModels[0]
+    }
 }

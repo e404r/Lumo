@@ -9,15 +9,15 @@ import CoreGraphics
 enum USC {
     static let W:     Double = 640
     static let ISL_H: Double = 176
-    static let CARD_X: Double = 10;  static let CARD_Y: Double = 42
-    static let CARD_W: Double = 620; static let CARD_H: Double = 124; static let CARD_R: Double = 20
-    static let REST_X: Double = 140; static let REST_Y: Double = 104
-    static let D_BOX:  Double = 62
+    static let CARD_X: Double = 10;  static let CARD_Y: Double = 46
+    static let CARD_W: Double = 620; static let CARD_H: Double = 114; static let CARD_R: Double = 20
+    static let REST_X: Double = 140; static let REST_Y: Double = 103
+    static let D_BOX:  Double = 56
     static let FOLLOW_MIN: Double = 60    // CARD_X + 50
     static let FOLLOW_MAX: Double = 580   // CARD_X + CARD_W - 50
-    static let TEXT_X: Double = 196;  static let TEXT_Y: Double = 94
-    static let BAR_X0: Double = 46;   static let BAR_X1: Double = 520;  static let BAR_Y: Double = 118
-    static let CHOOSE_X: Double = 60; static let CHOOSE_Y: Double = 101; static let CHOOSE_D: Double = 62
+    static let TEXT_X: Double = 196;  static let TEXT_Y: Double = 86
+    static let BAR_X0: Double = 46;   static let BAR_X1: Double = 540;  static let BAR_Y: Double = 114
+    static let CHOOSE_X: Double = 60; static let CHOOSE_Y: Double = 103; static let CHOOSE_D: Double = 52
     static let LOCK_IN:  Double = 60
     static let LOCK_OUT: Double = 90
     static let MOUTH_AJAR: Double = 0.20

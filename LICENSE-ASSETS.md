@@ -1,28 +1,33 @@
-# Coucou — name, character and artwork
+# Lumo — Brand, Artwork and Attribution
 
-Copyright (c) 2026 Louis Raillé. All rights reserved, except as stated below.
+Copyright (c) 2026 Lumo Contributors. All rights reserved.
 
-The [MIT License](LICENSE) covers the **source code** of Coucou. It does **not** cover the brand and the artwork listed here, which remain the property of Louis Raillé:
+The [MIT License](LICENSE) covers the **source code** of Lumo. This document outlines the assets, brand guidelines, and attribution to the original inspiration.
 
-- the names **“Coucou”** and **“Mochi”**;
-- the **Mochi character** — its design, look, expressions and animations as a character;
-- the **app icon** and **menu bar icon** (`NotchBuddy/Assets.xcassets/`);
-- the **sounds** (`NotchBuddy/Resources/sounds/`);
-- the **images, GIFs and videos** in `docs/media/` and `design/`.
+---
 
-## What you can do
+## 🌟 Inspiration & Original Attribution
 
-- Build and run Coucou from this repository, for yourself, as it is.
-- Fork it and contribute back with pull requests.
-- Show, review, write or talk about Coucou (articles, videos, posts), including screenshots and the demo media.
+Lumo was created as an evolution and dedicated Google Antigravity & Gemini adaptation of **[Coucou](https://github.com/Louis-CFM/coucou)**, originally designed and built by **Louis Raillé ([@Louis-CFM](https://github.com/Louis-CFM))**.
 
-## What you can't do without written permission
+We hold immense admiration and gratitude for Louis Raillé's visionary idea of turning the MacBook notch into an interactive AI companion.
 
-- Publish or distribute an app, a fork or a derivative work under the name “Coucou” or “Mochi”, or with the Coucou icon, the Mochi character or the Coucou sounds — on the App Store, on GitHub releases, or anywhere else.
-- Use any of these assets commercially, or in a way that suggests your project is Coucou or is made or endorsed by its author.
+In full accordance with Coucou's original asset guidelines:
+- The names **“Coucou”** and **“Mochi”**, the original Mochi character design, and the original Coucou artwork remain the intellectual property of **Louis Raillé**.
+- Lumo uses its **own distinct brand name (“Lumo”)**, its **own application and menu bar icons**, its **own mascot (“Gemini Star”)**, and focuses natively on the **Google Antigravity CLI (`agy`)** and **Google Gemini AI models**.
 
-If you fork Coucou to ship your own app, that's welcome under the MIT License: just give it **your own name, icon, character and sounds**.
+---
 
-## Questions or permission requests
+## 🎨 Lumo Brand & Assets
 
-Open an issue on [GitHub](https://github.com/Louis-CFM/coucou/issues) or write to raillelouis@gmail.com.
+The following assets are unique to Lumo:
+- The name **“Lumo”**;
+- The **Gemini Star mascot & UI artwork** (`GeminiCoreView.swift`, `UploadCanvasView.swift`);
+- The **app icons** and **menu bar icons** (`NotchBuddy/Assets.xcassets/AppIcon.appiconset/`, `NotchBuddy/Assets.xcassets/MenuBarIcon.imageset/`).
+
+### Permitted Uses
+- You are free to build, run, fork, and contribute back to Lumo under the terms of the MIT License.
+- You can review, demo, and showcase Lumo in articles, videos, and tutorials.
+
+### Restrictions
+- If you fork Lumo to publish a separate application, please respect the same open-source ethos: give your project its own unique name, branding, and assets.

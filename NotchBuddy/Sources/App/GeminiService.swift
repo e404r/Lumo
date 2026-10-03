@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import SwiftUI
 
 // MARK: - Keychain helpers
 
@@ -91,13 +92,13 @@ final class KeychainStore: @unchecked Sendable {
     }
 }
 
-// MARK: - CLI Companion Service
+// MARK: - Gemini / Antigravity Companion Service
 // Lumo operates as a companion for the Antigravity CLI (`agy`).
-// Model inference is executed natively via your Google One AI Premium (Ultra) subscription.
+// Model inference is executed natively via Google Gemini models (Gemini 3.8 Flash, Pro, Ultra).
 
 @MainActor
-final class ClaudeService {
-    static let shared = ClaudeService()
+final class GeminiService {
+    static let shared = GeminiService()
 
     var apiKey: String? { nil }
 
@@ -136,10 +137,11 @@ final class ClaudeService {
         return nil
     }
 
-    func chat(query: String, context: PromptContext?, state: AppState) async {
+    func chat(query: String, context: PromptContext?, state: AppState, sessionId: UUID? = nil) async {
+        let targetId = sessionId ?? state.activeSessionId
         guard let agyPath = resolveAgyPath() else {
-            state.stateOverride = nil
-            state.chatHistory.append(ChatMessage(role: .assistant, content: "Could not locate `agy` executable. Please verify that Antigravity CLI is installed at ~/.local/bin/agy."))
+            state.setSessionThinking(sessionId: targetId, thinking: false)
+            state.appendMessage(to: targetId, message: ChatMessage(role: .assistant, content: "Could not locate `agy` executable. Please verify that Antigravity CLI is installed at ~/.local/bin/agy."))
             return
         }
 
@@ -158,13 +160,24 @@ final class ClaudeService {
             }
         }
 
-        state.stateOverride = .thinking
+        state.setSessionThinking(sessionId: targetId, thinking: true)
 
-        let result: String = await Task.detached(priority: .userInitiated) { () -> String in
+        let targetModel = state.chatSessions.first(where: { $0.id == targetId })?.model ?? state.selectedModel
+        let targetEffort = state.chatSessions.first(where: { $0.id == targetId })?.effort ?? state.selectedEffort
+
+        let result: String = await Task.detached(priority: .userInitiated) { [targetModel, targetEffort] () -> String in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: agyPath)
-            // -c continues recent session context; -p prints response
-            process.arguments = ["-c", "-p", fullPrompt]
+            
+            var args = ["-c"]
+            if !targetModel.isEmpty {
+                args.append(contentsOf: ["--model", targetModel])
+            }
+            if !targetEffort.isEmpty {
+                args.append(contentsOf: ["--effort", targetEffort])
+            }
+            args.append(contentsOf: ["-p", fullPrompt])
+            process.arguments = args
 
             var env = ProcessInfo.processInfo.environment
             let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -199,10 +212,24 @@ final class ClaudeService {
             }
         }.value
 
-        state.stateOverride = nil
-        state.chatHistory.append(ChatMessage(role: .assistant, content: result))
+        state.setSessionThinking(sessionId: targetId, thinking: false)
+        state.appendMessage(to: targetId, message: ChatMessage(role: .assistant, content: result))
         SoundEngine.shared.play("finish")
         VoiceManager.shared.speak(result)
+
+        if state.view != .prompt {
+            state.updateTask(id: "integration_gemini", state: .finished)
+            if let taskIdx = state.tasks.firstIndex(where: { $0.id == "integration_gemini" }) {
+                state.tasks[taskIdx].steps.append("\(targetModel) response ready")
+            }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                if state.mode == .expanded {
+                    state.view = .finished
+                } else {
+                    NotificationCenter.default.post(name: .hookExpand, object: IslandView.finished)
+                }
+            }
+        }
     }
 }
 

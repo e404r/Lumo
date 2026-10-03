@@ -42,7 +42,6 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     // MARK: - Setup & Permissions
 
     private func setupRecognizer() {
-        // Try current locale, fallback to en-US
         if let rec = SFSpeechRecognizer(locale: Locale.current), rec.isAvailable {
             speechRecognizer = rec
         } else {
@@ -51,29 +50,39 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         speechRecognizer?.delegate = self
     }
 
-    func requestPermissions() {
-        SFSpeechRecognizer.requestAuthorization { [weak self] authStatus in
-            Task { @MainActor in
-                switch authStatus {
-                case .authorized:
-                    self?.requestMicrophoneAccess()
-                default:
-                    self?.isAuthorized = false
-                    self?.statusDescription = "Speech recognition permission denied"
-                }
+    // Non-isolated helper so TCC block invocations from background threads don't trigger MainActor assertions
+    nonisolated private static func requestSpeechAuth() async -> SFSpeechRecognizerAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status)
             }
         }
     }
 
-    private func requestMicrophoneAccess() {
-        AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-            Task { @MainActor in
-                self?.isAuthorized = granted
-                if !granted {
-                    self?.statusDescription = "Microphone permission denied"
-                } else {
-                    self?.statusDescription = "Ready for voice commands"
-                }
+    // Non-isolated helper for microphone access request
+    nonisolated private static func requestMicrophoneAuth() async -> Bool {
+        await withCheckedContinuation { continuation in
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+    }
+
+    func requestPermissions() {
+        Task {
+            let speechStatus = await Self.requestSpeechAuth()
+            guard speechStatus == .authorized else {
+                self.isAuthorized = false
+                self.statusDescription = "Speech recognition permission denied"
+                return
+            }
+
+            let micGranted = await Self.requestMicrophoneAuth()
+            self.isAuthorized = micGranted
+            if micGranted {
+                self.statusDescription = "Ready for voice commands"
+            } else {
+                self.statusDescription = "Microphone permission denied"
             }
         }
     }
@@ -82,6 +91,43 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         let speechAuth = SFSpeechRecognizer.authorizationStatus() == .authorized
         let micAuth = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         self.isAuthorized = speechAuth && micAuth
+    }
+
+    // MARK: - Non-isolated Background Bridges
+    // CoreAudio and SFSpeech call blocks on background realtime threads.
+    // Making these methods nonisolated static prevents the Swift compiler from injecting MainActor dispatch assertions.
+
+    nonisolated private static func installAudioTap(
+        on node: AVAudioNode,
+        format: AVAudioFormat,
+        request: SFSpeechAudioBufferRecognitionRequest,
+        onLevel: @escaping @Sendable (Float) -> Void
+    ) {
+        node.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+            request.append(buffer)
+
+            guard let channelData = buffer.floatChannelData?[0] else { return }
+            let frames = Int(buffer.frameLength)
+            var sum: Float = 0
+            for i in 0..<frames {
+                let sample = channelData[i]
+                sum += sample * sample
+            }
+            let rms = sqrt(sum / Float(max(frames, 1)))
+            let normalized = min(max(rms * 12, 0), 1)
+
+            onLevel(normalized)
+        }
+    }
+
+    nonisolated private static func createRecognitionTask(
+        recognizer: SFSpeechRecognizer,
+        request: SFSpeechAudioBufferRecognitionRequest,
+        onResult: @escaping @Sendable (SFSpeechRecognitionResult?, Error?) -> Void
+    ) -> SFSpeechRecognitionTask {
+        recognizer.recognitionTask(with: request) { result, error in
+            onResult(result, error)
+        }
     }
 
     // MARK: - Recording & Speech Recognition
@@ -100,12 +146,15 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // Ensure authorized
         if !isAuthorized {
             requestPermissions()
+            statusDescription = "Granting permissions…"
             return
         }
 
         // Cancel previous task if any
         recognitionTask?.cancel()
         recognitionTask = nil
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
         silenceTimer?.invalidate()
         silenceTimer = nil
 
@@ -114,62 +163,61 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         self.recognizedText = ""
         self.audioLevel = 0.0
 
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
         let inputNode = audioEngine.inputNode
+        inputNode.removeTap(onBus: 0)
 
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest else {
-            statusDescription = "Unable to create recognition request"
+        guard let recognizer = speechRecognizer else {
+            statusDescription = "Speech recognizer unavailable"
             return
         }
 
-        recognitionRequest.shouldReportPartialResults = true
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = true
         if #available(macOS 10.15, *) {
-            // Prefer on-device recognition if available for speed and privacy
-            if speechRecognizer?.supportsOnDeviceRecognition == true {
-                recognitionRequest.requiresOnDeviceRecognition = false
+            if recognizer.supportsOnDeviceRecognition {
+                req.requiresOnDeviceRecognition = false
             }
         }
+        self.recognitionRequest = req
 
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            guard let self else { return }
+        self.recognitionTask = Self.createRecognitionTask(recognizer: recognizer, request: req) { result, error in
+            let text = result?.bestTranscription.formattedString
+            let isFinal = result?.isFinal ?? false
+            let hasError = error != nil
 
             Task { @MainActor in
-                if let result = result {
-                    let text = result.bestTranscription.formattedString
-                    self.recognizedText = text
-                    self.onTextUpdateHandler?(text)
-                    self.resetSilenceTimer()
+                let manager = VoiceManager.shared
+                guard manager.isRecording else { return }
 
-                    if result.isFinal {
-                        self.finishRecording()
+                if let text = text {
+                    manager.recognizedText = text
+                    manager.onTextUpdateHandler?(text)
+                    manager.resetSilenceTimer()
+
+                    if isFinal {
+                        manager.finishRecording()
                     }
                 }
 
-                if error != nil {
-                    self.finishRecording()
+                if hasError {
+                    manager.finishRecording()
                 }
             }
         }
 
-        // Install audio tap for live transcription and audio level metering
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-            self?.recognitionRequest?.append(buffer)
+        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+            statusDescription = "Audio input format unavailable"
+            finishRecording()
+            return
+        }
 
-            // Calculate RMS audio level for waveform visualization
-            guard let channelData = buffer.floatChannelData?[0] else { return }
-            let frames = Int(buffer.frameLength)
-            var sum: Float = 0
-            for i in 0..<frames {
-                let sample = channelData[i]
-                sum += sample * sample
-            }
-            let rms = sqrt(sum / Float(max(frames, 1)))
-            let normalized = min(max(rms * 12, 0), 1)
-
+        Self.installAudioTap(on: inputNode, format: recordingFormat, request: req) { level in
             Task { @MainActor in
-                self?.audioLevel = normalized
+                VoiceManager.shared.audioLevel = level
             }
         }
 
@@ -181,7 +229,7 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             SoundEngine.shared.play("peek")
         } catch {
             statusDescription = "Audio Engine error: \(error.localizedDescription)"
-            stopRecording()
+            finishRecording()
         }
     }
 
@@ -194,10 +242,14 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     }
 
     private func finishRecording() {
-        audioEngine.stop()
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
+        recognitionRequest = nil
+        recognitionTask = nil
 
         isRecording = false
         audioLevel = 0.0
@@ -229,7 +281,6 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
 
         stopSpeaking()
 
-        // Clean code blocks before reading
         let cleaned = cleanTextForSpeech(text)
         guard !cleaned.isEmpty else { return }
 
@@ -252,11 +303,8 @@ final class VoiceManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     }
 
     private func cleanTextForSpeech(_ text: String) -> String {
-        // Strip markdown code fences ```...```
         var result = text.replacingOccurrences(of: "```[\\s\\S]*?```", with: " (code omitted) ", options: .regularExpression)
-        // Strip backticks `...`
         result = result.replacingOccurrences(of: "`([^`]+)`", with: "$1", options: .regularExpression)
-        // Strip excessive asterisks / hashes
         result = result.replacingOccurrences(of: "[#*]", with: "", options: .regularExpression)
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }

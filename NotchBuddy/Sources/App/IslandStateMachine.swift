@@ -18,7 +18,7 @@ final class IslandStateMachine {
     var onTransition: ((State, State) -> Void)?
 
     /// home → petit delay (seconds). Override for debug.
-    var homeToPetitDelay: TimeInterval = 15
+    var homeToPetitDelay: TimeInterval = 15.0
     /// petit → hidden delay (seconds). Override for debug.
     var petitToHiddenDelay: TimeInterval = 60
     /// coucou → petit delay after greeting animation ends (no hover). ~0.6s syncs with canvas collapse.
@@ -72,9 +72,9 @@ final class IslandStateMachine {
         }
     }
 
-    /// Compact island clicked
+    /// Island clicked (compact or hidden -> expand to home)
     func click() {
-        guard state == .petit else { return }
+        guard state != .home else { return }
         cancelTimers()
         transition(to: .home)
     }
@@ -123,6 +123,9 @@ final class IslandStateMachine {
         homeCollapseWork?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self, self.state == .home else { return }
+            if AppState.shared.view == .prompt || AppState.shared.view == .uploading || AppState.shared.isPinned {
+                return
+            }
             self.transition(to: .petit)
         }
         homeCollapseWork = item

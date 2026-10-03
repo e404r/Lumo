@@ -10,28 +10,9 @@ struct SettingsView: View {
     @State private var statusMessage: String = ""
     @State private var hooksInstalled: Bool = HookServer.shared.isHooksConfigured
 
-    // Integration keys
-    @State private var resendKey: String    = KeychainStore.shared.get("resend-api-key")  ?? ""
-    @State private var resendFrom: String   = KeychainStore.shared.get("resend-from")     ?? ""
-    @State private var n8nUrl: String       = KeychainStore.shared.get("n8n-url")         ?? ""
-    @State private var n8nKey: String       = KeychainStore.shared.get("n8n-api-key")     ?? ""
-    @State private var vercelToken: String  = KeychainStore.shared.get("vercel-token")    ?? ""
-    @State private var githubToken: String  = KeychainStore.shared.get("github-token")    ?? ""
-    @State private var stripeKey: String    = KeychainStore.shared.get("stripe-api-key")  ?? ""
-    @State private var calcomKey: String    = KeychainStore.shared.get("calcom-api-key")  ?? ""
-    @State private var notionKey: String    = KeychainStore.shared.get("notion-api-key")  ?? ""
-
     // Hotkey
     @State private var hotkeyFlags: UInt    = AppState.shared.hotkeyFlags
     @State private var hotkeyCode: UInt16   = AppState.shared.hotkeyCode
-
-    // Vercel project filter
-    @State private var vercelProjects: [String] = []
-    @State private var loadingVercel: Bool = false
-
-    // n8n workflow filter
-    @State private var n8nWorkflows: [String] = []
-    @State private var loadingN8n: Bool = false
 
     // Bindings in minutes for the absence field
     private var absenceMinutes: Binding<Double> {
@@ -48,7 +29,7 @@ struct SettingsView: View {
                 // MARK: Google Antigravity CLI Integration
                 GroupBox("Google Antigravity CLI Integration") {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Lumo operates as a native HUD companion for your terminal `agy` session, powered by Google One AI Premium (Ultra). No API keys or external credits required.")
+                        Text("Lumo operates as a native HUD companion for your terminal `agy` session, powered by Google One AI Premium (Ultra). No external API keys required.")
                             .font(.system(size: 11.5))
                             .foregroundColor(.secondary)
 
@@ -101,10 +82,11 @@ struct SettingsView: View {
                                 .font(.system(size: 10.5))
                                 .foregroundColor(.secondary)
                         }
-                        .padding(.vertical, 2)
 
-                        HStack(spacing: 10) {
-                            Button("Install / Repair Hooks") {
+                        Divider()
+
+                        HStack(spacing: 12) {
+                            Button("Install Hooks") {
                                 installHooks()
                             }
                             .buttonStyle(.borderedProminent)
@@ -120,6 +102,86 @@ struct SettingsView: View {
                                 openTerminal()
                             }
                             .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(8)
+                }
+
+                // MARK: AI Model & Reasoning Engine
+                GroupBox("AI Model & Reasoning Engine") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Select the default intelligence engine for Lumo HUD and Antigravity CLI. Powered by Google One AI Ultra.")
+                            .font(.system(size: 11.5))
+                            .foregroundColor(.secondary)
+
+                        // Model Cards / Radio Rows
+                        VStack(spacing: 6) {
+                            ForEach(AIModelOption.allModels) { model in
+                                let isSelected = (state.selectedModel == model.id)
+                                Button {
+                                    state.selectedModel = model.id
+                                    SoundEngine.shared.play("blip")
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                                            .foregroundColor(isSelected ? Color(hex: model.tagColor) : .secondary)
+                                            .font(.system(size: 13))
+
+                                        Image(systemName: model.icon)
+                                            .foregroundColor(Color(hex: model.tagColor))
+                                            .font(.system(size: 13))
+                                            .frame(width: 18)
+
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            HStack(spacing: 6) {
+                                                Text(model.name)
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .foregroundColor(.primary)
+
+                                                Text(model.provider)
+                                                    .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                                                    .foregroundColor(Color(hex: model.tagColor))
+                                                    .padding(.horizontal, 5)
+                                                    .padding(.vertical, 1.5)
+                                                    .background(Color(hex: model.tagColor).opacity(0.12))
+                                                    .clipShape(Capsule())
+                                            }
+                                            Text(model.subtitle)
+                                                .font(.system(size: 10.5))
+                                                .foregroundColor(.secondary)
+                                        }
+
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(isSelected ? Color(hex: model.tagColor).opacity(0.08) : Color.white.opacity(0.02))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(isSelected ? Color(hex: model.tagColor).opacity(0.4) : Color.gray.opacity(0.15), lineWidth: 1)
+                                            )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        Divider()
+
+                        // Reasoning Effort Selector
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Reasoning Effort")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.secondary)
+
+                            Picker("Effort", selection: $state.selectedEffort) {
+                                Text("Low").tag("low")
+                                Text("Medium").tag("medium")
+                                Text("High").tag("high")
+                            }
+                            .pickerStyle(.segmented)
                         }
                     }
                     .padding(8)
@@ -154,105 +216,7 @@ struct SettingsView: View {
                     .padding(8)
                 }
 
-                // MARK: Integrations
-                GroupBox("Integrations") {
-                    VStack(alignment: .leading, spacing: 14) {
-
-                        // Resend
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#22C55E")).frame(width: 8, height: 8)
-                                Text("Resend").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("API key  (re_…)", text: $resendKey)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("From address  (you@yourdomain.com)", text: $resendFrom)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // n8n
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#F29B38")).frame(width: 8, height: 8)
-                                Text("n8n").font(.system(size: 12, weight: .semibold))
-                            }
-                            TextField("Instance URL  (https://…)", text: $n8nUrl)
-                                .textFieldStyle(.roundedBorder)
-                            SecureField("API key", text: $n8nKey)
-                                .textFieldStyle(.roundedBorder)
-                            IntegrationFilterRow(
-                                label: "Workflows",
-                                items: n8nWorkflows,
-                                filter: $state.n8nWorkflowFilter,
-                                loading: loadingN8n,
-                                onLoad: loadN8nWorkflows
-                            )
-                        }
-
-                        // Vercel
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#7C5CFF")).frame(width: 8, height: 8)
-                                Text("Vercel").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Token", text: $vercelToken)
-                                .textFieldStyle(.roundedBorder)
-                            IntegrationFilterRow(
-                                label: "Projects",
-                                items: vercelProjects,
-                                filter: $state.vercelProjectFilter,
-                                loading: loadingVercel,
-                                onLoad: loadVercelProjects
-                            )
-                        }
-
-                        // GitHub
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#F4505E")).frame(width: 8, height: 8)
-                                Text("GitHub").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Personal Access Token", text: $githubToken)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // Stripe
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#0570DE")).frame(width: 8, height: 8)
-                                Text("Stripe").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Secret key  (sk_live_… or sk_test_…)", text: $stripeKey)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // Cal.com
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#C9956A")).frame(width: 8, height: 8)
-                                Text("Cal.com").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("API key  (cal_live_…)", text: $calcomKey)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        // Notion
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color(hex: "#E8E8E8")).frame(width: 8, height: 8)
-                                Text("Notion").font(.system(size: 12, weight: .semibold))
-                            }
-                            SecureField("Integration token  (secret_…)", text: $notionKey)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        Button("Save integrations") { saveIntegrations() }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding(6)
-                }
-
-                // MARK: Son
+                // MARK: Sound
                 GroupBox("Sound") {
                     VStack(alignment: .leading, spacing: 10) {
                         Toggle("Enable sounds", isOn: $state.soundEnabled)
@@ -290,49 +254,6 @@ struct SettingsView: View {
                     .padding(6)
                 }
 
-                // MARK: Active pills
-                GroupBox("Active pills") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("VS Code")
-                                .font(.system(size: 12, weight: .semibold))
-                            Circle().fill(Color(hex: "#F5F6F8")).frame(width: 8, height: 8)
-                            Spacer()
-                            Text("Always active")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-
-                        Divider()
-
-                        Text("\(state.activeIntegrations.count)/4 slots used")
-                            .font(.system(size: 11))
-                            .foregroundColor(state.activeIntegrations.count >= 4 ? .orange : .secondary)
-
-                        ForEach(AgentTask.toggleableIntegrationIds, id: \.self) { id in
-                            let task = AgentTask.integrationAgents.first { $0.id == id }!
-                            let isOn = state.activeIntegrations.contains(id)
-                            let atMax = state.activeIntegrations.count >= 4 && !isOn
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(Color(hex: task.color))
-                                    .frame(width: 10, height: 10)
-                                Text(task.name)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(atMax ? .secondary : .primary)
-                                Spacer()
-                                Toggle("", isOn: Binding(
-                                    get: { isOn },
-                                    set: { _ in state.toggleIntegration(id) }
-                                ))
-                                .labelsHidden()
-                                .disabled(atMax)
-                            }
-                        }
-                    }
-                    .padding(6)
-                }
-
                 // MARK: Hotkey
                 GroupBox("Hotkey") {
                     VStack(alignment: .leading, spacing: 10) {
@@ -360,6 +281,46 @@ struct SettingsView: View {
                         .padding(6)
                 }
 
+                // MARK: Developer & GitHub
+                GroupBox("Developer & Community") {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(colors: [Color(hex: "#38BDF8"), Color(hex: "#818CF8"), Color(hex: "#C084FC")],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Developed by e404r")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Official repository & source code on GitHub")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            if let url = URL(string: "https://github.com/e404r") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 11))
+                                Text("GitHub: e404r")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(6)
+                }
+
                 if !statusMessage.isEmpty {
                     Text(statusMessage)
                         .font(.system(size: 12))
@@ -371,7 +332,7 @@ struct SettingsView: View {
             }
             .padding(20)
         }
-        .frame(width: 480, height: 720)
+        .frame(width: 480, height: 680)
     }
 
     // MARK: - Actions
@@ -410,157 +371,6 @@ struct SettingsView: View {
         }.first.map { $0.activate(options: .activateIgnoringOtherApps) }
         if activated == nil {
             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
-        }
-    }
-
-    private func saveIntegrations() {
-        saveKey("resend-api-key",  value: resendKey)
-        saveKey("resend-from",     value: resendFrom)
-        saveKey("n8n-url",         value: n8nUrl)
-        saveKey("n8n-api-key",     value: n8nKey)
-        saveKey("vercel-token",    value: vercelToken)
-        saveKey("github-token",    value: githubToken)
-        saveKey("stripe-api-key",  value: stripeKey)
-        saveKey("calcom-api-key",  value: calcomKey)
-        saveKey("notion-api-key",  value: notionKey)
-        statusMessage = "✓ Integration keys saved."
-    }
-
-    /// Saves non-empty value; removes only if key was previously set (explicit user clear).
-    private func saveKey(_ key: String, value: String) {
-        if value.isEmpty {
-            KeychainStore.shared.remove(key)
-        } else {
-            KeychainStore.shared.set(key, value: value)
-        }
-    }
-
-    // MARK: - Vercel project list
-
-    private func loadVercelProjects() {
-        guard let token = KeychainStore.shared.get("vercel-token") else {
-            statusMessage = "❌ Save Vercel token first."
-            return
-        }
-        loadingVercel = true
-        guard let url = URL(string: "https://api.vercel.com/v9/projects?limit=100") else { return }
-        var req = URLRequest(url: url, timeoutInterval: 10)
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        URLSession.shared.dataTask(with: req) { data, response, _ in
-            let names: [String]
-            if let data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let projects = json["projects"] as? [[String: Any]] {
-                names = projects.compactMap { $0["name"] as? String }.sorted()
-            } else {
-                names = []
-            }
-            DispatchQueue.main.async {
-                self.vercelProjects = names
-                self.loadingVercel = false
-                if names.isEmpty { self.statusMessage = "❌ No Vercel projects found." }
-            }
-        }.resume()
-    }
-
-    // MARK: - n8n workflow list
-
-    private func loadN8nWorkflows() {
-        guard let apiKey  = KeychainStore.shared.get("n8n-api-key"),
-              let rawBase = KeychainStore.shared.get("n8n-url") else {
-            statusMessage = "❌ Save n8n URL and API key first."
-            return
-        }
-        loadingN8n = true
-        let base = rawBase.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let urls = ["\(base)/api/v1/workflows?limit=100", "\(base)/rest/workflows?limit=100"]
-        fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: 0)
-    }
-
-    private func fetchN8nWorkflows(urls: [String], apiKey: String, idx: Int) {
-        guard idx < urls.count, let url = URL(string: urls[idx]) else {
-            DispatchQueue.main.async { self.loadingN8n = false; self.statusMessage = "❌ No n8n workflows found." }
-            return
-        }
-        var req = URLRequest(url: url, timeoutInterval: 10)
-        req.setValue(apiKey, forHTTPHeaderField: "X-N8N-API-KEY")
-        URLSession.shared.dataTask(with: req) { data, response, _ in
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard let data, code == 200 else {
-                self.fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: idx + 1)
-                return
-            }
-            let items: [[String: Any]]
-            if let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-               let arr = obj["data"] as? [[String: Any]] { items = arr }
-            else if let arr = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] { items = arr }
-            else { items = [] }
-            let names = items.compactMap { $0["name"] as? String }.sorted()
-            DispatchQueue.main.async {
-                self.n8nWorkflows = names
-                self.loadingN8n = false
-                if names.isEmpty { self.statusMessage = "❌ No n8n workflows found." }
-            }
-        }.resume()
-    }
-}
-
-// MARK: - Integration filter row (reusable for Vercel / n8n)
-
-struct IntegrationFilterRow: View {
-    let label: String
-    let items: [String]
-    @Binding var filter: Set<String>
-    let loading: Bool
-    let onLoad: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(label)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                Spacer()
-                if loading {
-                    ProgressView().scaleEffect(0.6)
-                } else {
-                    Button(items.isEmpty ? "Load list" : "Refresh") { onLoad() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                }
-                if !filter.isEmpty {
-                    Button("Clear") { filter = [] }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .foregroundColor(.secondary)
-                }
-            }
-            if !items.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(items, id: \.self) { item in
-                        Toggle(item, isOn: Binding(
-                            get: { filter.isEmpty || filter.contains(item) },
-                            set: { on in
-                                if on { filter.insert(item) }
-                                else  {
-                                    // First click on any item: switch from "all" to explicit set
-                                    if filter.isEmpty { filter = Set(items).subtracting([item]) }
-                                    else { filter.remove(item) }
-                                    if filter.count == items.count { filter = [] } // all = empty
-                                }
-                            }
-                        ))
-                        .font(.system(size: 11))
-                        .toggleStyle(.checkbox)
-                    }
-                }
-                .padding(.leading, 4)
-                if !filter.isEmpty {
-                    Text("Watching \(filter.count) of \(items.count)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-            }
         }
     }
 }

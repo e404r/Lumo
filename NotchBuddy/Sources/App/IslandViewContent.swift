@@ -24,7 +24,97 @@ struct IslandViewContent: View {
         case .result:    ResultView(state: state)
         case .note:      NoteView(state: state)
         case .settings:  SettingsIslandView(state: state)
-        case .greeting:  EmptyView()  // GreetingCanvasView overlaid in IslandRootView
+        case .greeting:  LumoStarGreetingCard(state: state)
+        }
+    }
+}
+
+// MARK: - Greeting Card (Living Gemini Star Welcome)
+
+struct LumoStarGreetingCard: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            CardBackground(wash: .indigo)
+
+            VStack(alignment: .leading, spacing: 8) {
+                // Top Badge
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color(hex: "#38BDF8"))
+                    Text("Google Antigravity • Lumo AI")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#38BDF8"))
+
+                    Text("Online")
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Color(hex: "#10B981"))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: "#10B981").opacity(0.12))
+                        .clipShape(Capsule())
+                }
+
+                // Welcoming Title
+                Text("Hey! Ready to code with you.")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(Color(hex: "#F8FAFC"))
+
+                // Subtitle + Quick Action
+                HStack {
+                    Text("Your intelligent notch companion is active.")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(Color(hex: "#94A3B8"))
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            state.view = .overview
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text("Get Started")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 9.5, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5.5)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#2563EB"), Color(hex: "#4F46E5")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 1))
+                        .shadow(color: Color(hex: "#2563EB").opacity(0.35), radius: 6, x: 0, y: 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.leading, 120)
+            .padding(.trailing, 16)
+            .padding(.vertical, 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: 104)
+        .onAppear {
+            SoundEngine.shared.play("open")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(name: .starWaveRequested, object: nil)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
+                if state.view == .greeting {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        state.view = .overview
+                    }
+                }
+            }
         }
     }
 }
@@ -33,93 +123,250 @@ struct IslandViewContent: View {
 
 struct OverviewView: View {
     @ObservedObject var state: AppState
-    @State private var showingN8nDetail = false
-
-    var agent: AgentTask? { state.focusTask }
 
     var body: some View {
-        HStack(spacing: 10) {
-            // Left card: title row + ticker below + ↗ button overlay
-            ZStack(alignment: .topLeading) {
-                CardBackground(wash: nil)
+        // Single Unified Full-Width Card spanning the entire island
+        LumoUnifiedOverviewCard(state: state)
+    }
+}
 
-                // Title row + ticker stacked (or integration card)
-                if let agent = agent {
-                    if agent.isIntegration {
-                        IntegrationCardView(task: agent, showingDetail: $showingN8nDetail)
-                    } else {
-                        VStack(alignment: .leading, spacing: 0) {
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(Color(hex: agent.color))
-                                    .frame(width: 7, height: 7)
-                                Text(agent.name)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(Color(hex: "#F5F6F8"))
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                                    .layoutPriority(1)
-                                Text(agent.source == .antigravity ? "Antigravity" : (agent.source == .claudeCode ? "Claude Code" : "n8n"))
-                                    .font(.system(size: 11))
-                                    .foregroundColor(Color(hex: "#8E939C"))
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                                Spacer(minLength: 2)
-                                if agent.steps.count > 1 {
-                                    Text("\(min(agent.stepIndex + 1, agent.steps.count))/\(agent.steps.count)")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(Color(hex: "#6B7079"))
-                                        .fixedSize()
-                                }
-                            }
-                            .padding(.top, 6)
-                            .padding(.leading, 108)
-                            .padding(.trailing, 36)
+// MARK: - Unified Full-Width Card: Antigravity Model Selector & Quick Chat
 
-                            TickerView(task: agent)
-                                .frame(height: 44)
-                                .padding(.top, 6)
-                                .padding(.leading, 108)
-                                .padding(.trailing, 12)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .padding(.top, 4)
+struct LumoUnifiedOverviewCard: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            CardBackground(wash: nil)
+
+            VStack(alignment: .leading, spacing: 10) {
+                // Top Row: Companion Identity + Ready Status + Attached Context + Voice Mic
+                HStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color(hex: "#10B981"))
+                            .frame(width: 6, height: 6)
+                        Text("Google Antigravity")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(hex: "#F8FAFC"))
                     }
-                }
 
-                // ↗ jump button — last in ZStack so it renders on top; hidden while any detail is open
-                if !showingN8nDetail {
-                    Button(action: { openAgentTarget(agent) }) {
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundColor(Color(hex: "#5F646D"))
-                            .frame(width: 16, height: 16)
-                            .background(Color.white.opacity(0.07))
-                            .clipShape(Circle())
+                    Text("Ready")
+                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Color(hex: "#10B981"))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: "#10B981").opacity(0.12))
+                        .clipShape(Capsule())
+
+                    if let _ = state.promptContext {
+                        HStack(spacing: 4) {
+                            Image(systemName: "paperclip")
+                                .font(.system(size: 9))
+                            Text(contextName)
+                                .font(.system(size: 9.5, weight: .medium))
+                                .lineLimit(1)
+                            Button {
+                                state.promptContext = nil
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 8, weight: .bold))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .foregroundColor(Color(hex: "#38BDF8"))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background(Color(hex: "#38BDF8").opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+
+                    Spacer()
+
+                    // Quick Voice / Mic Button (strictly manual toggle)
+                    Button {
+                        if VoiceManager.shared.isRecording {
+                            VoiceManager.shared.stopRecording()
+                        } else {
+                            VoiceManager.shared.startRecording(
+                                onUpdate: { _ in },
+                                onFinished: { spoken in
+                                    let query = spoken.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    guard !query.isEmpty else { return }
+                                    let targetId = state.activeSessionId
+                                    state.appendMessage(to: targetId, message: ChatMessage(role: .user, content: query))
+                                    state.setSessionThinking(sessionId: targetId, thinking: true)
+                                    let ctx = state.promptContext
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        state.view = .prompt
+                                    }
+                                    Task {
+                                        await GeminiService.shared.chat(query: query, context: ctx, state: state, sessionId: targetId)
+                                    }
+                                }
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: VoiceManager.shared.isRecording ? "waveform.circle.fill" : "mic.fill")
+                                .font(.system(size: 10.5))
+                            if VoiceManager.shared.isRecording {
+                                Text("Listening…")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                        }
+                        .foregroundColor(VoiceManager.shared.isRecording ? Color(hex: "#EF4444") : Color(hex: "#94A3B8"))
+                        .padding(.horizontal, VoiceManager.shared.isRecording ? 8 : 6)
+                        .padding(.vertical, 4)
+                        .background(VoiceManager.shared.isRecording ? Color(hex: "#EF4444").opacity(0.15) : Color.white.opacity(0.06))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(VoiceManager.shared.isRecording ? Color(hex: "#EF4444").opacity(0.5) : Color.white.opacity(0.08), lineWidth: 0.8))
                     }
                     .buttonStyle(.plain)
-                    .padding(.top, 8)
-                    .padding(.trailing, 10)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .help("Click to activate voice command")
+                }
+
+                // Bottom Row: Model Selector + Reasoning Effort + Chat Action Button
+                HStack(spacing: 8) {
+                    // Model Selector Dropdown Menu
+                    Menu {
+                        Section("Select AI Model") {
+                            ForEach(AIModelOption.allModels) { model in
+                                Button {
+                                    state.selectedModel = model.id
+                                    SoundEngine.shared.play("blip")
+                                } label: {
+                                    HStack {
+                                        Text(model.name)
+                                        if state.selectedModel == model.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: state.currentModelOption.icon)
+                                .font(.system(size: 10.5, weight: .bold))
+                            Text(state.currentModelOption.name)
+                                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 8))
+                                .foregroundColor(Color(hex: state.currentModelOption.tagColor).opacity(0.8))
+                        }
+                        .foregroundColor(Color(hex: state.currentModelOption.tagColor))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5.5)
+                        .background(Color(hex: state.currentModelOption.tagColor).opacity(0.14))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color(hex: state.currentModelOption.tagColor).opacity(0.35), lineWidth: 0.8))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+
+                    // Reasoning Effort Dropdown Menu
+                    Menu {
+                        Section("Reasoning Effort") {
+                            ForEach(["low", "medium", "high"], id: \.self) { effort in
+                                Button {
+                                    state.selectedEffort = effort
+                                    SoundEngine.shared.play("blip")
+                                } label: {
+                                    HStack {
+                                        Text(effort.capitalized)
+                                        if state.selectedEffort == effort {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(Color(hex: "#10B981"))
+                                .frame(width: 5, height: 5)
+                            Text("Effort: \(state.selectedEffort.capitalized)")
+                                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 7.5))
+                        }
+                        .foregroundColor(Color(hex: "#94A3B8"))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5.5)
+                        .background(Color.white.opacity(0.05))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 0.8))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+
+                    Spacer()
+
+                    // Primary Chat Button
+                    Button {
+                        SoundEngine.shared.play("open")
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                            state.view = .prompt
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                                .font(.system(size: 10.5))
+                            Text("Open Chat")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#2563EB"), Color(hex: "#4F46E5")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 1))
+                        .shadow(color: Color(hex: "#2563EB").opacity(0.35), radius: 6, x: 0, y: 2)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .frame(width: 322)
-
-            // Right card: agent pills
-            CardBackground(wash: nil) {
-                AgentPillsView(state: state)
-            }
+            .padding(.leading, 120)
+            .padding(.trailing, 16)
+            .padding(.vertical, 12)
         }
-        .onChange(of: state.focusId) { _, _ in showingN8nDetail = false }
+        .frame(maxWidth: .infinity, maxHeight: 104)
     }
 
-    private func openAgentTarget(_ task: AgentTask?) {
+    private var contextName: String {
+        if let ctx = state.promptContext {
+            switch ctx {
+            case .file(let name, _): return name
+            case .window(let appName, _, _): return appName
+            }
+        }
+        return ""
+    }
+}
+
+fileprivate func openAgentTarget(_ task: AgentTask?) {
         guard let task else { return }
         switch task.id {
-        case "integration_claude":
+        case "integration_gemini", "integration_claude":
+            let antigravityBundleId = "com.google.antigravity-ide"
             let vscodeBundleId = "com.microsoft.VSCode"
-            if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == vscodeBundleId }) {
+            if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == antigravityBundleId }) {
                 app.activate(options: .activateIgnoringOtherApps)
+            } else if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == vscodeBundleId }) {
+                app.activate(options: .activateIgnoringOtherApps)
+            } else if FileManager.default.fileExists(atPath: "/Applications/Antigravity IDE.app") {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Antigravity IDE.app"))
+            } else if FileManager.default.fileExists(atPath: "/Applications/Antigravity.app") {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Antigravity.app"))
             } else {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Visual Studio Code.app"))
             }
@@ -158,7 +405,6 @@ struct OverviewView: View {
             }
         }
     }
-}
 
 // MARK: - Empty
 
@@ -187,53 +433,169 @@ struct EmptyStateView: View {
     }
 }
 
+// MARK: - Siri Live Waveform
+
+struct SiriWaveformView: View {
+    let audioLevel: Float
+    let barCount: Int = 7
+    @State private var phase: Double = 0
+
+    var body: some View {
+        HStack(spacing: 2.5) {
+            ForEach(0..<barCount, id: \.self) { index in
+                let center = Double(barCount - 1) / 2.0
+                let dist = 1.0 - (abs(Double(index) - center) / center)
+                let baseH = 4.0 + dist * 5.0
+                let dynamicH = CGFloat(baseH + Double(audioLevel) * 14.0 * dist + sin(phase + Double(index) * 0.9) * 2.5)
+
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#38BDF8"),
+                                Color(hex: "#818CF8"),
+                                Color(hex: "#C084FC")
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 2.5, height: max(3, dynamicH))
+            }
+        }
+        .frame(height: 18)
+        .onAppear {
+            withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                phase = .pi * 2
+            }
+        }
+    }
+}
+
 // MARK: - Approval
 
 struct ApprovalView: View {
     @ObservedObject var state: AppState
     @ObservedObject private var voiceManager = VoiceManager.shared
+    @State private var allowHovered = false
+    @State private var denyHovered = false
+    @State private var alwaysHovered = false
 
     var approval: ApprovalInfo? { state.pendingApproval }
 
     var body: some View {
         ZStack {
             CardBackground(wash: .amber)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    AgentWho(task: state.focusTask, label: "needs permission")
+            VStack(alignment: .leading, spacing: 6) {
+                // Header row
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color(hex: "#F59E0B"))
+                    AgentWho(task: state.focusTask, label: "terminal request")
                     Spacer()
                     if voiceManager.isRecording {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 6, height: 6)
-                                .scaleEffect(1.0 + CGFloat(voiceManager.audioLevel) * 0.8)
-                            Text("Voice: Say 'Allow' or 'Deny'")
+                        HStack(spacing: 5) {
+                            SiriWaveformView(audioLevel: voiceManager.audioLevel)
+                            Text("Say 'Allow' or 'Deny'")
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(Color.secondary)
+                                .foregroundColor(Color(hex: "#FCD34D"))
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: "#78350F").opacity(0.4))
+                        .clipShape(Capsule())
                     }
                 }
+
+                // Cyberpunk Terminal Code Block
                 CodeBlock(text: approval?.command ?? approval?.tool ?? "…")
+
+                // Action buttons
                 HStack(spacing: 8) {
-                    SecondaryButton("Deny") {
+                    // Deny button
+                    Button(action: {
                         voiceManager.stopRecording()
                         HookServer.shared.sendApprovalDecision("deny")
+                    }) {
+                        Text("Deny")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(denyHovered ? Color(hex: "#F43F5E") : Color(hex: "#E2E8F0"))
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 6)
+                            .background(denyHovered ? Color(hex: "#F43F5E").opacity(0.18) : Color.white.opacity(0.06))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(denyHovered ? Color(hex: "#F43F5E").opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1))
+                            .scaleEffect(denyHovered ? 1.03 : 1.0)
                     }
-                    PrimaryButton("Allow") {
+                    .buttonStyle(.plain)
+                    .onHover { denyHovered = $0 }
+
+                    // Allow button (Glowing Emerald / Cyan Cyberpunk Gradient)
+                    Button(action: {
                         voiceManager.stopRecording()
                         HookServer.shared.sendApprovalDecision("allow")
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Allow")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#10B981"), Color(hex: "#059669")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                        .shadow(color: Color(hex: "#10B981").opacity(allowHovered ? 0.6 : 0.3), radius: allowHovered ? 8 : 4, x: 0, y: 2)
+                        .scaleEffect(allowHovered ? 1.04 : 1.0)
                     }
-                    SecondaryButton("Always") {
+                    .buttonStyle(.plain)
+                    .onHover { allowHovered = $0 }
+
+                    // Always button
+                    Button(action: {
                         voiceManager.stopRecording()
                         HookServer.shared.sendApprovalDecision("always")
+                    }) {
+                        Text("Always")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(alwaysHovered ? Color(hex: "#38BDF8") : Color(hex: "#94A3B8"))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(alwaysHovered ? Color(hex: "#38BDF8").opacity(0.15) : Color.white.opacity(0.05))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(alwaysHovered ? Color(hex: "#38BDF8").opacity(0.35) : Color.white.opacity(0.06), lineWidth: 1))
+                            .scaleEffect(alwaysHovered ? 1.02 : 1.0)
                     }
+                    .buttonStyle(.plain)
+                    .onHover { alwaysHovered = $0 }
 
+                    Spacer()
+
+                    // Voice Approval Toggle Mic
                     Button(action: toggleVoiceApproval) {
-                        Image(systemName: voiceManager.isRecording ? "waveform" : "mic.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(voiceManager.isRecording ? .red : Color(hex: "#8E939C"))
-                            .frame(width: 24, height: 24)
+                        ZStack {
+                            if voiceManager.isRecording {
+                                Circle()
+                                    .fill(Color(hex: "#F59E0B").opacity(0.3))
+                                    .scaleEffect(1.0 + CGFloat(voiceManager.audioLevel) * 0.8)
+                                    .frame(width: 24, height: 24)
+                            }
+                            Image(systemName: voiceManager.isRecording ? "waveform" : "mic.fill")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(voiceManager.isRecording ? Color(hex: "#F59E0B") : Color(hex: "#8E939C"))
+                        }
+                        .frame(width: 24, height: 24)
+                        .background(voiceManager.isRecording ? Color(hex: "#B45309").opacity(0.3) : Color.white.opacity(0.04))
+                        .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                     .help("Toggle voice approval")
@@ -241,12 +603,10 @@ struct ApprovalView: View {
             }
             .padding(.leading, 116)
             .padding(.trailing, 16)
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .onAppear {
-                if voiceManager.isAuthorized {
-                    startVoiceApproval()
-                }
+                // Never auto-start recording on appear; user manually triggers via mic button if desired
             }
             .onDisappear {
                 voiceManager.stopRecording()
@@ -298,7 +658,7 @@ struct QuestionView: View {
                     }
                 }
             }
-            .padding(.leading, 116)
+            .padding(.leading, 120)
             .padding(.trailing, 16)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -315,20 +675,35 @@ struct ErrorView: View {
         ZStack {
             CardBackground(wash: .red)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "n8n")
-                Text("Workflow stopped.")
-                    .font(.system(size: 15, weight: .semibold))
-                Text("Gmail node timed out after 30s. Retry or open n8n.")
-                    .font(.system(size: 12))
+                HStack(spacing: 6) {
+                    Circle().fill(Color(hex: "#EF4444")).frame(width: 8, height: 8)
+                    Text("Antigravity • Issue")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#EF4444"))
+                }
+                Text("Process paused.")
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundColor(Color(hex: "#F8FAFC"))
+                Text(state.focusTask?.steps.last ?? "Antigravity encountered an issue during execution.")
+                    .font(.system(size: 11.5))
                     .foregroundColor(Color(hex: "#FF8D97"))
+                    .lineLimit(1)
                 HStack(spacing: 8) {
-                    PrimaryButton("Retry") { /* retry */ }
-                    SecondaryButton("Open in n8n") { /* open */ }
+                    PrimaryButton("Open in Chat", icon: "bubble.left.and.bubble.right.fill") {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            state.view = .prompt
+                        }
+                    }
+                    SecondaryButton("Dismiss", kbd: "esc") {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            state.view = .overview
+                        }
+                    }
                 }
             }
-            .padding(.leading, 116)
+            .padding(.leading, 120)
             .padding(.trailing, 16)
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -339,37 +714,97 @@ struct ErrorView: View {
 struct FinishedView: View {
     @ObservedObject var state: AppState
 
+    private var targetSession: ChatSession? {
+        state.chatSessions.first(where: { $0.id == state.activeSessionId }) ?? state.chatSessions.first
+    }
+
+    private var sessionModelName: String {
+        targetSession?.model ?? state.selectedModel
+    }
+
+    private var displayTitle: String {
+        if let task = state.focusTask {
+            let nonThinking = task.steps.filter { step in
+                !step.lowercased().contains("thinking") && !step.isEmpty
+            }
+            if let last = nonThinking.last {
+                let clean = last.replacingOccurrences(of: "✓ ", with: "")
+                if !clean.isEmpty { return clean }
+            }
+            if !task.name.isEmpty && task.name != "config" && task.name != "Antigravity" {
+                return "\(task.name) completed"
+            }
+        }
+        if let lastMsg = targetSession?.history.last, lastMsg.role == .assistant {
+            return "\(sessionModelName) response ready"
+        }
+        return "Task completed successfully"
+    }
+
+    private var displaySubtitle: String {
+        if let lastMsg = targetSession?.history.last, lastMsg.role == .assistant {
+            let preview = lastMsg.content.prefix(55).replacingOccurrences(of: "\n", with: " ")
+            return preview.isEmpty ? "Ready to review in chat conversation" : "\(preview)..."
+        }
+        return "Ready to review and continue in chat"
+    }
+
     var body: some View {
         ZStack {
             CardBackground(wash: .green)
-            VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "Antigravity finished")
-                Text(state.focusTask?.steps.last ?? "Session finished")
-                    .font(.system(size: 15, weight: .semibold))
+            VStack(alignment: .leading, spacing: 6) {
+                // Header badge
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color(hex: "#10B981"))
+                    Text("Antigravity • Finished")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#10B981"))
+
+                    Text(sessionModelName)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Color(hex: "#94A3B8"))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(Capsule())
+                }
+
+                // Title
+                Text(displayTitle)
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundColor(Color(hex: "#F8FAFC"))
+                    .lineLimit(1)
+
+                // Subtitle
+                Text(displaySubtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundColor(Color(hex: "#94A3B8"))
+                    .lineLimit(1)
+
+                // Action buttons: Navigate to Chat directly!
                 HStack(spacing: 8) {
-                    #if !APPSTORE
-                    PrimaryButton("Open terminal") {
-                        let terminalBundleIds = [
-                            "com.apple.Terminal", "com.googlecode.iterm2", "net.kovidgoyal.kitty",
-                            "com.mitchellh.ghostty", "com.warp.WarpTerminal", "com.microsoft.VSCode"
-                        ]
-                        let activated = terminalBundleIds.compactMap { id in
-                            NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == id }
-                        }.first.map { $0.activate(options: .activateIgnoringOtherApps) }
-                        if activated == nil {
-                            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+                    PrimaryButton("View in Chat", icon: "bubble.left.and.bubble.right.fill") {
+                        if let sId = targetSession?.id {
+                            state.switchSession(id: sId)
                         }
-                        NotificationCenter.default.post(name: .islandCollapse, object: nil)
+                        SoundEngine.shared.play("open")
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            state.view = .prompt
+                        }
                     }
-                    #endif
-                    SecondaryButton("OK") {
-                        NotificationCenter.default.post(name: .islandCollapse, object: nil)
+
+                    SecondaryButton("Dismiss", kbd: "esc") {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            state.view = .overview
+                        }
                     }
                 }
             }
-            .padding(.leading, 116)
+            .padding(.leading, 120)
             .padding(.trailing, 16)
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -395,50 +830,74 @@ struct ConfusedView: View {
 
 // MARK: - Upload (drop zone)
 
+// MARK: - Upload (drop zone)
+
 struct UploadView: View {
     @ObservedObject var state: AppState
     @State private var dashPhase: CGFloat = 0
     @State private var breathAngle: Double = 0
-    // Timer only runs while this is the active tab — killed on deactivation
     @State private var animTimer: Timer? = nil
 
     private var borderOpacity: Double {
-        let breathe = 0.11 + 0.04 * (sin(breathAngle) * 0.5 + 0.5)
-        return state.fileDragOver ? 0.65 : breathe
+        let breathe = 0.25 + 0.10 * (sin(breathAngle) * 0.5 + 0.5)
+        return state.fileDragOver ? 0.90 : breathe
     }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color(hex: "#0E0F11"))
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    state.fileDragOver
-                        ? Color(hex: "#22C55E").opacity(borderOpacity)
-                        : Color.white.opacity(borderOpacity),
-                    style: StrokeStyle(lineWidth: 1.5, dash: [6, 5], dashPhase: dashPhase)
-                )
+                .fill(Color(hex: "#0E1017"))
+
+            // Cosmic Radial Glow
             RoundedRectangle(cornerRadius: 20)
                 .fill(RadialGradient(
-                    colors: [Color(hex: "#22C55E").opacity(state.fileDragOver ? 0.13 : 0), Color.clear],
-                    center: .bottom, startRadius: 0, endRadius: 200
+                    colors: [
+                        Color(hex: "#38BDF8").opacity(state.fileDragOver ? 0.22 : 0.08),
+                        Color(hex: "#6366F1").opacity(state.fileDragOver ? 0.15 : 0.04),
+                        Color.clear
+                    ],
+                    center: .center, startRadius: 0, endRadius: 240
                 ))
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Drop your files here")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(state.fileDragOver ? Color(hex: "#34D399") : Color(hex: "#D5D7DB"))
+
+            // Animated Gemini Gradient Border
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#38BDF8"), Color(hex: "#818CF8"), Color(hex: "#C084FC"), Color(hex: "#38BDF8")],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ).opacity(borderOpacity),
+                    style: StrokeStyle(lineWidth: state.fileDragOver ? 1.8 : 1.2, dash: [8, 6], dashPhase: dashPhase)
+                )
+                .shadow(color: Color(hex: "#38BDF8").opacity(state.fileDragOver ? 0.35 : 0), radius: 8)
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 5) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color(hex: "#38BDF8"))
+                    Text("Drop files to attach to Antigravity")
+                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(hex: "#F8FAFC"))
+                }
+
+                Text("Context will be analyzed by Gemini 3.8 Flash")
+                    .font(.system(size: 11.5))
+                    .foregroundColor(Color(hex: "#94A3B8"))
+
                 HStack(spacing: 6) {
-                    ForEach(["PDF", "Images", "Code", "Docs"], id: \.self) { label in
-                        Text(label)
-                            .font(.system(size: 11))
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.white.opacity(0.07))
-                            .foregroundColor(Color(hex: "#B9BDC4"))
+                    ForEach([("Code", "#38BDF8"), ("PDF", "#818CF8"), ("Docs", "#A855F7"), ("Images", "#EC4899"), ("Data", "#10B981")], id: \.0) { item in
+                        Text(item.0)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 3.5)
+                            .background(Color(hex: item.1).opacity(0.12))
+                            .foregroundColor(Color(hex: item.1))
                             .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color(hex: item.1).opacity(0.25), lineWidth: 0.8))
                     }
                 }
             }
-            .padding(.leading, 196)
+            .padding(.leading, 180)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onChange(of: state.view) { _, newView in
@@ -452,10 +911,9 @@ struct UploadView: View {
 
     private func startTimer() {
         guard animTimer == nil else { return }
-        // 20 fps — smooth enough for slow dash, 3× lighter than 60fps
         animTimer = Timer.scheduledTimer(withTimeInterval: 1.0/20.0, repeats: true) { _ in
-            dashPhase  += 1.0          // 20 pt/s march
-            breathAngle += 0.9 / 20.0  // advance sin phase at 0.9 rad/s
+            dashPhase   += 1.2
+            breathAngle += 0.9 / 20.0
         }
     }
 
@@ -470,93 +928,101 @@ struct UploadView: View {
 struct UploadingView: View {
     @ObservedObject var state: AppState
 
-    // Bar geometry in content coords (content has 10pt H padding each side).
-    // Island bar: left=36, right=562 (640-78), width=526.
-    // Content bar: left=26, width=526.
-    // barTop=58 → island y = content_start(42)+58 = 100; bot cy=103 (center = barTop+3).
     private let barLeft: CGFloat  = 26
     private let barWidth: CGFloat = 526
     private let barTop: CGFloat   = 58
 
     var body: some View {
-        // TimelineView fires at display refresh rate — progress derived from elapsed wall time,
-        // not from @Published uploadProgress (which only flips to 1.0 at completion).
         TimelineView(.animation) { tl in
             let elapsed: Double = {
                 guard let start = state.uploadStartTime else { return 0 }
                 return tl.date.timeIntervalSince(start)
             }()
             let t        = min(1.0, max(0, elapsed / state.uploadDuration))
-            let progress = CGFloat(t * (2 - t))          // ease-out quad
+            let progress = CGFloat(t * (2 - t))
             let fillWidth = max(0, barWidth * progress)
-            let isDone   = state.uploadProgress >= 0.999  // only true after handle() sets it
+            let isDone   = state.uploadProgress >= 0.999
 
             ZStack(alignment: .topLeading) {
-                // Background: dark base
+                // Background: obsidian base
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(hex: "#141518"))
+                    .fill(Color(hex: "#0E1017"))
 
-                // Permanent green radial wash — brighter at completion
+                // Cosmic radial wash
                 RoundedRectangle(cornerRadius: 20)
                     .fill(RadialGradient(
-                        colors: [Color(hex: "#34D399").opacity(isDone ? 0.28 : 0.14), Color.clear],
-                        center: UnitPoint(x: 0.5, y: 1.4),
+                        colors: [
+                            Color(hex: "#38BDF8").opacity(isDone ? 0.25 : 0.12),
+                            Color(hex: "#818CF8").opacity(isDone ? 0.15 : 0.06),
+                            Color.clear
+                        ],
+                        center: UnitPoint(x: 0.5, y: 1.2),
                         startRadius: 0,
                         endRadius: 260
                     ))
 
                 // Bar track
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(0.09))
+                    .fill(Color.white.opacity(0.08))
                     .frame(width: barWidth, height: 6)
                     .offset(x: barLeft, y: barTop)
 
-                // Bar fill
+                // Bar fill with Gemini Gradient
                 RoundedRectangle(cornerRadius: 3)
                     .fill(LinearGradient(
-                        colors: [Color(hex: "#1FA87A"), Color(hex: "#34D399")],
+                        colors: [Color(hex: "#2563EB"), Color(hex: "#38BDF8"), Color(hex: "#A855F7")],
                         startPoint: .leading, endPoint: .trailing
                     ))
                     .frame(width: fillWidth, height: 6)
                     .offset(x: barLeft, y: barTop)
 
-                // Glow trail behind dot leading edge
-                if progress > 0.01 {
+                // Glow trail behind leading edge
+                if progress > 0.01 && !isDone {
                     Ellipse()
-                        .fill(Color(hex: "#6EE7B7").opacity(0.45))
-                        .frame(width: 28, height: 12)
+                        .fill(Color(hex: "#38BDF8").opacity(0.65))
+                        .frame(width: 24, height: 12)
                         .blur(radius: 5)
-                        .offset(x: barLeft + fillWidth - 14, y: barTop - 3)
+                        .offset(x: barLeft + fillWidth - 12, y: barTop - 3)
                 }
 
-                // Text row — filename + % (above bar)
+                // Text row — filename + %
                 HStack(spacing: 0) {
                     if isDone {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "#34D399"))
-                        Text("  \(state.droppedFile?.name ?? "File")")
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundColor(Color(hex: "#34D399"))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color(hex: "#10B981"))
+                        Text("  \(state.droppedFile?.name ?? "File") ready")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(hex: "#10B981"))
                             .lineLimit(1).truncationMode(.middle)
                     } else {
-                        Text("Uploading \(state.droppedFile?.name ?? "file")")
-                            .font(.system(size: 12.5))
-                            .foregroundColor(Color(hex: "#A9ADB5"))
-                            .lineLimit(1).truncationMode(.middle)
+                        HStack(spacing: 5) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(hex: "#38BDF8"))
+                            Text("Attaching \(state.droppedFile?.name ?? "file")")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundColor(Color(hex: "#F8FAFC"))
+                                .lineLimit(1).truncationMode(.middle)
+                        }
                         Spacer(minLength: 8)
                         Text("\(Int(progress * 100)) %")
-                            .font(.system(size: 12.5, weight: .medium))
-                            .foregroundColor(Color(hex: "#A9ADB5"))
-                            .monospacedDigit()
+                            .font(.system(size: 12.5, weight: .bold, design: .monospaced))
+                            .foregroundColor(Color(hex: "#38BDF8"))
                     }
                 }
                 .frame(width: barWidth)
-                .offset(x: barLeft, y: barTop - 22)
+                .offset(x: barLeft, y: barTop - 24)
 
-                // Subtle top border (same as CardBackground)
+                // Subtle border
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.12), Color(hex: "#38BDF8").opacity(0.15), Color.clear],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             }
         }
     }
@@ -569,17 +1035,76 @@ struct ChooseView: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            CardBackground(wash: nil)
+            CardBackground(wash: .indigo)
             VStack(alignment: .leading, spacing: 8) {
-                let fileName = state.droppedFile?.name ?? "file"
-                (Text(fileName).font(.system(size: 14, weight: .semibold)) + Text(" is ready.").font(.system(size: 14, weight: .semibold)))
-                Text("What do you want to do with it?").font(.system(size: 12.5)).foregroundColor(Color(hex: "#9398A1"))
-                HStack(spacing: 8) {
-                    PrimaryButton("Ask a question") { state.view = .prompt }
-                    SecondaryButton("Send by email") { state.view = .mail }
+                let fileName = state.droppedFile?.name ?? "File"
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(Color(hex: "#10B981"))
+                        .frame(width: 6, height: 6)
+                    Text("Attached to Context")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(Color(hex: "#10B981"))
+                }
+
+                Text("\(fileName) is attached")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(Color(hex: "#F8FAFC"))
+
+                Text("Context is loaded into Antigravity. Start pair-programming.")
+                    .font(.system(size: 11.5))
+                    .foregroundColor(Color(hex: "#94A3B8"))
+
+                HStack(spacing: 10) {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            state.view = .prompt
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "bubble.left.and.bubble.right.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("Ask Gemini")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#2563EB"), Color(hex: "#4F46E5")],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.25), lineWidth: 1))
+                        .shadow(color: Color(hex: "#2563EB").opacity(0.35), radius: 6, x: 0, y: 2)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            state.view = .overview
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Done")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        }
+                        .foregroundColor(Color(hex: "#CBD5E1"))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.leading, 98)
+            .padding(.leading, 120)
             .padding(.trailing, 18)
         }
     }
@@ -771,7 +1296,86 @@ struct MailView: View {
     }
 }
 
-// MARK: - Prompt (chat)
+// MARK: - Multi-Agent Chat Tabs & Prompt
+
+struct TabThinkingIndicator: View {
+    let color: Color
+    @State private var isPulsing = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 5, height: 5)
+            .scaleEffect(isPulsing ? 1.3 : 0.8)
+            .opacity(isPulsing ? 1.0 : 0.4)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                    isPulsing = true
+                }
+            }
+    }
+}
+
+struct ChatTabPill: View {
+    let session: ChatSession
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+    let canClose: Bool
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: session.modelOption.icon)
+                .font(.system(size: 8.5))
+                .foregroundColor(Color(hex: session.modelOption.tagColor))
+
+            Text(session.title)
+                .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                .foregroundColor(isSelected ? .white : Color(hex: "#94A3B8"))
+                .lineLimit(1)
+
+            if session.isThinking {
+                TabThinkingIndicator(color: Color(hex: session.modelOption.tagColor))
+            }
+
+            if canClose {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(isHovered || isSelected ? Color(hex: "#CBD5E1") : Color(hex: "#64748B"))
+                        .padding(2)
+                        .background(Color.white.opacity(isHovered ? 0.15 : 0))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            isSelected
+                ? Color(hex: session.modelOption.tagColor).opacity(0.18)
+                : (isHovered ? Color.white.opacity(0.08) : Color.white.opacity(0.04))
+        )
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(
+                    isSelected
+                        ? Color(hex: session.modelOption.tagColor).opacity(0.55)
+                        : (isHovered ? Color.white.opacity(0.18) : Color.white.opacity(0.07)),
+                    lineWidth: 0.9
+                )
+        )
+        .contentShape(Capsule())
+        .onTapGesture {
+            onSelect()
+        }
+        .onHover { isHovered = $0 }
+    }
+}
 
 struct PromptView: View {
     @ObservedObject var state: AppState
@@ -784,9 +1388,120 @@ struct PromptView: View {
             CardBackground(wash: .indigo)
 
             VStack(alignment: .leading, spacing: 6) {
-                if let ctx = state.promptContext {
-                    ContextChip(context: ctx).padding(.top, 4)
+                // Multi-Agent Chat Tab Bar Row
+                HStack(spacing: 5) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 5) {
+                            ForEach(state.chatSessions) { session in
+                                ChatTabPill(
+                                    session: session,
+                                    isSelected: session.id == state.activeSessionId,
+                                    onSelect: {
+                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                            state.switchSession(id: session.id)
+                                        }
+                                    },
+                                    onClose: {
+                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                            state.closeChatSession(id: session.id)
+                                        }
+                                    },
+                                    canClose: state.chatSessions.count > 1
+                                )
+                            }
+                        }
+                    }
+
+                    // New Chat Tab Menu (+)
+                    Menu {
+                        Section("New Agent Chat") {
+                            ForEach(AIModelOption.allModels) { model in
+                                Button {
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                        state.newChatSession(model: model.id)
+                                    }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: model.icon)
+                                        Text(model.name)
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 9.5, weight: .bold))
+                            .foregroundColor(Color(hex: "#94A3B8"))
+                            .frame(width: 20, height: 20)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Start new agent tab")
+
+                    Spacer(minLength: 4)
+
+                    if let ctx = state.promptContext {
+                        ContextChip(context: ctx)
+                    }
+
+                    // Model & Effort Picker for Current Tab
+                    Menu {
+                        Section("Model for this Tab") {
+                            ForEach(AIModelOption.allModels) { model in
+                                Button {
+                                    state.selectedModel = model.id
+                                    SoundEngine.shared.play("blip")
+                                } label: {
+                                    HStack {
+                                        Text(model.name)
+                                        if state.selectedModel == model.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Section("Reasoning Effort") {
+                            ForEach(["low", "medium", "high"], id: \.self) { effort in
+                                Button {
+                                    state.selectedEffort = effort
+                                    SoundEngine.shared.play("blip")
+                                } label: {
+                                    HStack {
+                                        Text(effort.capitalized)
+                                        if state.selectedEffort == effort {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: state.currentModelOption.icon)
+                                .font(.system(size: 8))
+                            Text(state.currentModelOption.name)
+                                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 7))
+                                .foregroundColor(Color(hex: state.currentModelOption.tagColor).opacity(0.8))
+                        }
+                        .foregroundColor(Color(hex: state.currentModelOption.tagColor))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(Color(hex: state.currentModelOption.tagColor).opacity(0.14))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color(hex: state.currentModelOption.tagColor).opacity(0.28), lineWidth: 0.8))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
                 }
+                .padding(.top, 4)
 
                 if !state.chatHistory.isEmpty {
                     ScrollViewReader { proxy in
@@ -795,7 +1510,7 @@ struct PromptView: View {
                                 ForEach(state.chatHistory) { msg in
                                     ChatBubble(message: msg).id(msg.id)
                                 }
-                                if state.stateOverride != nil {
+                                if state.activeSession.isThinking {
                                     HStack { TypingDotsView(); Spacer(minLength: 32) }
                                         .id("typing")
                                 }
@@ -807,8 +1522,8 @@ struct PromptView: View {
                                 withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                             }
                         }
-                        .onChange(of: state.stateOverride) { _, v in
-                            if v != nil { withAnimation { proxy.scrollTo("typing", anchor: .bottom) } }
+                        .onChange(of: state.activeSession.isThinking) { _, isThinking in
+                            if isThinking { withAnimation { proxy.scrollTo("typing", anchor: .bottom) } }
                         }
                         .onAppear {
                             if let last = state.chatHistory.last {
@@ -818,45 +1533,140 @@ struct PromptView: View {
                     }
                     .frame(maxHeight: .infinity)
                 } else {
-                    Spacer()
+                    VStack(spacing: 5) {
+                        Spacer()
+                        HStack(spacing: 6) {
+                            Image(systemName: state.currentModelOption.icon)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(Color(hex: state.currentModelOption.tagColor))
+                            Text(state.currentModelOption.name)
+                                .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                        }
+                        Text(state.currentModelOption.subtitle)
+                            .font(.system(size: 10.5))
+                            .foregroundColor(Color(hex: "#64748B"))
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
                 }
 
+                // Live Voice Visualizer Bar when listening
+                if voiceManager.isRecording {
+                    HStack(spacing: 8) {
+                        SiriWaveformView(audioLevel: voiceManager.audioLevel)
+                        ShimmeringText("Listening… speak English")
+                            .font(.system(size: 11.5, weight: .medium))
+                        Spacer()
+                        Button(action: { voiceManager.stopRecording() }) {
+                            Text("Done")
+                                .font(.system(size: 10.5, weight: .bold))
+                                .foregroundColor(Color(hex: "#38BDF8"))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color(hex: "#38BDF8").opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(hex: "#0F172A").opacity(0.85))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#38BDF8").opacity(0.4), Color(hex: "#818CF8").opacity(0.3)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            )
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                // Input bar
                 HStack(spacing: 8) {
-                    TextField(voiceManager.isRecording ? "Listening to your voice…" : (state.chatHistory.isEmpty ? "Ask me anything or use voice…" : "Continue…"), text: $text)
+                    TextField(voiceManager.isRecording ? "Listening to your voice…" : (state.chatHistory.isEmpty ? "Ask Gemini anything or use voice…" : "Continue…"), text: $text)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 13))
+                        .font(.system(size: 12.5))
+                        .foregroundColor(Color(hex: "#F8FAFC"))
                         .focused($focused)
                         .onSubmit { sendMessage() }
 
-                    // Voice Command Microphone Button
+                    // Voice Command Microphone Button with glowing aura
                     Button(action: toggleVoice) {
                         ZStack {
                             if voiceManager.isRecording {
                                 Circle()
-                                    .fill(Color.red.opacity(0.3))
+                                    .fill(
+                                        RadialGradient(
+                                            colors: [Color(hex: "#38BDF8").opacity(0.55), Color(hex: "#818CF8").opacity(0.2), Color.clear],
+                                            center: .center,
+                                            startRadius: 2,
+                                            endRadius: 18
+                                        )
+                                    )
                                     .scaleEffect(1.0 + CGFloat(voiceManager.audioLevel) * 0.9)
-                                    .frame(width: 22, height: 22)
+                                    .frame(width: 26, height: 26)
                             }
                             Image(systemName: voiceManager.isRecording ? "waveform" : "mic.fill")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(voiceManager.isRecording ? Color.red : Color(hex: "#8E939C"))
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundColor(voiceManager.isRecording ? Color(hex: "#38BDF8") : Color(hex: "#94A3B8"))
                         }
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
+                        .background(voiceManager.isRecording ? Color(hex: "#2563EB").opacity(0.3) : Color.white.opacity(0.05))
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(voiceManager.isRecording ? Color(hex: "#38BDF8").opacity(0.5) : Color.clear, lineWidth: 1)
+                        )
                     }
                     .buttonStyle(.plain)
                     .help(voiceManager.isRecording ? "Stop voice recording (auto-sends on silence)" : "Voice Command")
 
+                    // Send Button
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(Color(hex: "#0B0C0E"))
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(text.isEmpty ? Color(hex: "#64748B") : .white)
+                            .frame(width: 24, height: 24)
+                            .background(
+                                Group {
+                                    if text.isEmpty {
+                                        Color.white.opacity(0.05)
+                                    } else {
+                                        LinearGradient(
+                                            colors: [Color(hex: "#3B82F6"), Color(hex: "#6366F1")],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    }
+                                }
+                            )
+                            .clipShape(Circle())
+                            .shadow(color: text.isEmpty ? .clear : Color(hex: "#3B82F6").opacity(0.4), radius: 4, x: 0, y: 1)
                     }
-                    .buttonStyle(SendButtonStyle())
+                    .buttonStyle(.plain)
                     .disabled(text.isEmpty)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(Color.white.opacity(0.07))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: "#090B10").opacity(0.8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    focused ?
+                                    LinearGradient(colors: [Color(hex: "#38BDF8").opacity(0.55), Color(hex: "#818CF8").opacity(0.4)], startPoint: .leading, endPoint: .trailing) :
+                                    LinearGradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.03)], startPoint: .leading, endPoint: .trailing),
+                                    lineWidth: focused ? 1.5 : 1
+                                )
+                        )
+                )
                 .simultaneousGesture(TapGesture().onEnded { focused = true })
             }
             .padding(.leading, 84)
@@ -895,10 +1705,12 @@ struct PromptView: View {
         guard !query.isEmpty else { return }
         text = ""
         focused = false
-        state.chatHistory.append(ChatMessage(role: .user, content: query))
-        state.stateOverride = .thinking
+        let targetId = state.activeSessionId
+        state.appendMessage(to: targetId, message: ChatMessage(role: .user, content: query))
+        state.setSessionThinking(sessionId: targetId, thinking: true)
+        let ctx = state.promptContext
         Task {
-            await ClaudeService.shared.chat(query: query, context: state.promptContext, state: state)
+            await GeminiService.shared.chat(query: query, context: ctx, state: state, sessionId: targetId)
             await MainActor.run { focused = true }
         }
     }
@@ -914,20 +1726,47 @@ struct ChatBubble: View {
             if message.role == .user {
                 Spacer(minLength: 32)
                 Text(message.content)
-                    .font(.system(size: 12.5))
-                    .foregroundColor(Color(hex: "#F1F2F4"))
+                    .font(.system(size: 12.5, weight: .regular))
+                    .foregroundColor(.white)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(Color.white.opacity(0.13))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(hex: "#2563EB"), Color(hex: "#4F46E5")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    )
+                    .shadow(color: Color(hex: "#2563EB").opacity(0.3), radius: 6, x: 0, y: 2)
             } else {
                 Text(message.content)
-                    .font(.system(size: 12.5))
-                    .foregroundColor(Color(hex: "#B0B5BE"))
+                    .font(.system(size: 12.5, weight: .regular))
+                    .foregroundColor(Color(hex: "#E2E8F0"))
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
-                Spacer(minLength: 8)
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(hex: "#0F131F").opacity(0.85))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [Color.white.opacity(0.10), Color(hex: "#38BDF8").opacity(0.06)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            )
+                    )
+                Spacer(minLength: 12)
             }
         }
     }
@@ -1060,274 +1899,44 @@ struct IntegrationCardView: View {
     @Binding var showingDetail: Bool
     @ObservedObject private var appState = AppState.shared
 
-    private var isConfigured: Bool {
-        switch task.id {
-        case "integration_claude":
-            return HookServer.shared.isHooksConfigured
-        case "integration_resend":  return KeychainStore.shared.get("resend-api-key") != nil
-        case "integration_n8n":     return KeychainStore.shared.get("n8n-api-key")    != nil
-        case "integration_vercel":  return KeychainStore.shared.get("vercel-token")   != nil
-        case "integration_github":  return KeychainStore.shared.get("github-token")   != nil
-        case "integration_stripe":  return KeychainStore.shared.get("stripe-api-key") != nil
-        case "integration_notion":  return KeychainStore.shared.get("notion-api-key") != nil
-        case "integration_calcom":  return KeychainStore.shared.get("calcom-api-key") != nil
-        default: return false
-        }
-    }
-
-    private var openURL: URL? {
-        switch task.id {
-        case "integration_claude":  return nil  // uses terminal button below
-        case "integration_resend":  return URL(string: "https://resend.com/emails")
-        case "integration_n8n":
-            if let s = KeychainStore.shared.get("n8n-url") { return URL(string: s) }
-            return nil
-        case "integration_vercel":  return URL(string: "https://vercel.com/dashboard")
-        case "integration_github":  return URL(string: "https://github.com")
-        case "integration_stripe":  return URL(string: "https://dashboard.stripe.com/payments")
-        case "integration_notion":  return URL(string: "https://notion.so")
-        case "integration_calcom":  return URL(string: "https://app.cal.com/bookings")
-        default: return nil
-        }
-    }
-
-    // VS Code with active session: show ticker layout (same as overview)
-    private var vsCodeSessionActive: Bool {
-        task.id == "integration_claude" && (task.state != .idle || !task.steps.isEmpty)
-    }
-
-    // n8n with a finished execution: show result row instead of "Open n8n" button
-    private var n8nHasActivity: Bool {
-        task.id == "integration_n8n" && !task.steps.isEmpty &&
-        (task.state == .finished || task.state == .error)
-    }
-
-    // Vercel with recent deployments
-    private var vercelHasActivity: Bool {
-        task.id == "integration_vercel" && !appState.vercelDeployments.isEmpty
-    }
-
-    // Resend with recent emails
-    private var resendHasData: Bool {
-        task.id == "integration_resend" && !appState.resendEmails.isEmpty
-    }
-
-    // GitHub with stats loaded
-    private var githubHasData: Bool {
-        task.id == "integration_github" && appState.githubStats != nil
-    }
-
-    // Stripe: show card as soon as first poll completes (balance OR payments)
-    private var stripeHasData: Bool {
-        task.id == "integration_stripe" && appState.stripeLoaded
-    }
-
-    // Cal.com: show calendar as soon as first poll completes
-    private var calcomHasData: Bool {
-        task.id == "integration_calcom" && appState.calcomLoaded
-    }
-
-    // Notion: show pages as soon as first poll completes
-    private var notionHasData: Bool {
-        task.id == "integration_notion" && appState.notionLoaded
-    }
-
     var body: some View {
-        if showingDetail && n8nHasActivity {
-            N8nDetailView(task: task) {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) { showingDetail = false }
-            }
-            .transition(.opacity)
-        } else if showingDetail && vercelHasActivity {
-            VercelDetailView(deployment: appState.vercelDeployments[0]) {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) { showingDetail = false }
-            }
-            .transition(.opacity)
-        } else if vercelHasActivity {
-            VercelDeploymentListView(deployments: appState.vercelDeployments, onOpenDetail: {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) { showingDetail = true }
-            })
-            .transition(.opacity)
-        } else if resendHasData {
-            ResendCardView(emails: appState.resendEmails, total: appState.resendTotal)
-                .transition(.opacity)
-        } else if githubHasData {
-            GitHubStatsCardView(stats: appState.githubStats!)
-                .transition(.opacity)
-        } else if stripeHasData {
-            StripeCardView()
-                .transition(.opacity)
-        } else if calcomHasData {
-            CalcomCardView()
-                .transition(.opacity)
-        } else if notionHasData {
-            NotionCardView()
-                .transition(.opacity)
-        } else if vsCodeSessionActive {
-            // Active session view — reuse overview layout
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color(hex: task.color))
-                        .frame(width: 7, height: 7)
-                    Text(task.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#F5F6F8"))
-                        .lineLimit(1).truncationMode(.tail)
-                        .layoutPriority(1)
-                    Text(task.id == "integration_claude" ? "Antigravity" : "Session")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "#8E939C"))
-                        .lineLimit(1).truncationMode(.tail)
-                    Spacer(minLength: 2)
-                    if task.steps.count > 1 {
-                        Text("\(min(task.stepIndex + 1, task.steps.count))/\(task.steps.count)")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(hex: "#6B7079"))
-                            .fixedSize()
-                    }
-                }
-                .padding(.top, 6)
-                .padding(.leading, 108)
-                .padding(.trailing, 36)
-
-                TickerView(task: task)
-                    .frame(height: 44)
-                    .padding(.top, 6)
-                    .padding(.leading, 108)
-                    .padding(.trailing, 12)
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(.top, 4)
-        } else {
-            // Idle / not connected view — slides in from left when returning from detail
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color(hex: task.color))
-                        .frame(width: 7, height: 7)
-                    Text(task.id == "integration_claude" ? "Antigravity" : task.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#F5F6F8"))
-                    Text("Integration")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "#8E939C"))
-                    Spacer(minLength: 2)
-                }
-                .padding(.top, 6)
-                .padding(.leading, 108)
-                .padding(.trailing, 36)
-
-                HStack(spacing: 5) {
-                    let stripeErr = task.id == "integration_stripe" ? appState.stripeError
-                                  : task.id == "integration_calcom"  ? appState.calcomError
-                                  : nil
-                    let dot = stripeErr != nil ? Color(hex: "#F4505E")
-                            : isConfigured    ? Color(hex: "#22C55E")
-                            :                   Color(hex: "#F4505E")
-                    let label = stripeErr ?? (isConfigured ? "Connected · loading…" : "Key not configured")
-                    Circle().fill(dot).frame(width: 5, height: 5)
-                    Text(label)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color(hex: task.color))
+                    .frame(width: 7, height: 7)
+                Text("Antigravity")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(hex: "#F5F6F8"))
+                    .lineLimit(1).truncationMode(.tail)
+                    .layoutPriority(1)
+                Text("Companion")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#8E939C"))
+                    .lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 2)
+                if task.steps.count > 1 {
+                    Text("\(min(task.stepIndex + 1, task.steps.count))/\(task.steps.count)")
                         .font(.system(size: 11))
                         .foregroundColor(Color(hex: "#6B7079"))
+                        .fixedSize()
                 }
-                .padding(.leading, 108)
-                .padding(.top, 2)
-
-                HStack(spacing: 8) {
-                    if task.id == "integration_claude" {
-                        Button("Open Visual Studio Code") { openVSCode() }
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(hex: task.color).opacity(0.7))
-                            .buttonStyle(.plain)
-                    } else if n8nHasActivity {
-                        // Clickable pill — tap to open execution detail
-                        let success = task.state == .finished
-                        let accent  = success ? Color(hex: "#22C55E") : Color(hex: "#F4505E")
-                        Button(action: {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) { showingDetail = true }
-                        }) {
-                            HStack(spacing: 5) {
-                                Circle().fill(accent).frame(width: 5, height: 5)
-                                Text(task.steps.first ?? "Workflow")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(Color(hex: "#C5C8CD"))
-                                    .lineLimit(1).truncationMode(.tail)
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 8, weight: .medium))
-                                    .foregroundColor(Color(hex: "#6B7079"))
-                            }
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(accent.opacity(0.1))
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(accent.opacity(0.22), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                    } else if let url = openURL {
-                        Button("Open \(task.name)") { NSWorkspace.shared.open(url) }
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(hex: task.color).opacity(0.85))
-                            .buttonStyle(.plain)
-                    }
-                    if task.id == "integration_stripe" {
-                        if isConfigured {
-                            Button("Refresh") { Task { @MainActor in StripePoller.shared.pollNow() } }
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(Color(hex: "#0570DE").opacity(0.85))
-                                .buttonStyle(.plain)
-                        }
-                    }
-                    if task.id == "integration_calcom" && isConfigured {
-                        Button("Refresh") { Task { @MainActor in CalcomPoller.shared.pollNow() } }
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(hex: "#C9956A").opacity(0.85))
-                            .buttonStyle(.plain)
-                    }
-                    if !isConfigured {
-                        Button("Settings…") {
-                            NotificationCenter.default.post(name: .openFullSettings, object: nil)
-                        }
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "#8E939C"))
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.leading, 108)
-                .padding(.top, 2)
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(.top, 4)
-            .transition(.opacity)
-        }
-    }
+            .padding(.top, 6)
+            .padding(.leading, 108)
+            .padding(.trailing, 36)
 
-    private func openVSCode() {
-        let ids = ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders", "com.vscodium.codium"]
-        let appURL = ids.compactMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }.first
-
-        // If we have a project folder, open it directly in VS Code
-        if let cwd = task.sessionCwd, !cwd.isEmpty, let appURL = appURL {
-            NSWorkspace.shared.open(
-                [URL(fileURLWithPath: cwd)],
-                withApplicationAt: appURL,
-                configuration: .init(),
-                completionHandler: nil
-            )
-            return
+            TickerView(task: task)
+                .frame(height: 44)
+                .padding(.top, 6)
+                .padding(.leading, 108)
+                .padding(.trailing, 12)
         }
-
-        // No cwd: activate running instance or launch fresh
-        if let running = ids.compactMap({ id in
-            NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == id }
-        }).first {
-            running.activate(options: .activateIgnoringOtherApps)
-            return
-        }
-        if let appURL = appURL {
-            NSWorkspace.shared.openApplication(at: appURL, configuration: .init(), completionHandler: nil)
-        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.top, 4)
     }
 }
+
 
 // MARK: - Vercel Deployment List View
 
@@ -2325,6 +2934,140 @@ struct TickerShimmerText: View {
 
 // MARK: - Agent pills (overview right card)
 
+struct GeminiQuickActionsView: View {
+    @ObservedObject var state: AppState
+    @ObservedObject private var voiceManager = VoiceManager.shared
+    @State private var chatHovered = false
+    @State private var micHovered = false
+    @State private var termHovered = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            // Header: Status + Ultra Badge
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(Color(hex: "#10B981"))
+                    .frame(width: 6, height: 6)
+                Text("Antigravity")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(hex: "#F1F5F9"))
+                Spacer()
+                Text("Ultra Core")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Color(hex: "#38BDF8"))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(hex: "#0284C7").opacity(0.18))
+                    .clipShape(Capsule())
+            }
+
+            // Quick Action Buttons Row
+            HStack(spacing: 6) {
+                // 1. Quick Chat button
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        state.view = .prompt
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 9))
+                        Text("Chat")
+                            .font(.system(size: 10.5, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(hex: "#2563EB").opacity(chatHovered ? 0.9 : 0.65), Color(hex: "#4F46E5").opacity(chatHovered ? 0.9 : 0.65)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.8))
+                    .scaleEffect(chatHovered ? 1.04 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .onHover { chatHovered = $0 }
+
+                // 2. Voice Mic Button
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        state.view = .prompt
+                        voiceManager.toggleRecording(
+                            onUpdate: { _ in },
+                            onFinished: { query in
+                                let targetId = state.activeSessionId
+                                state.appendMessage(to: targetId, message: ChatMessage(role: .user, content: query))
+                                state.setSessionThinking(sessionId: targetId, thinking: true)
+                                let ctx = state.promptContext
+                                Task {
+                                    await GeminiService.shared.chat(query: query, context: ctx, state: state, sessionId: targetId)
+                                }
+                            }
+                        )
+                    }
+                }) {
+                    Image(systemName: voiceManager.isRecording ? "waveform" : "mic.fill")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(voiceManager.isRecording ? Color(hex: "#38BDF8") : (micHovered ? Color.white : Color(hex: "#94A3B8")))
+                        .frame(width: 24, height: 24)
+                        .background(micHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.06))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+                        .scaleEffect(micHovered ? 1.05 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .onHover { micHovered = $0 }
+                .help("Quick Voice Command")
+
+                // 3. Terminal Jump Button
+                Button(action: {
+                    let terminalBundleIds = ["com.apple.Terminal", "com.googlecode.iterm2", "net.kovidgoyal.kitty", "com.mitchellh.ghostty"]
+                    if let hit = terminalBundleIds.compactMap({ id in
+                        NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == id }
+                    }).first {
+                        hit.activate(options: .activateIgnoringOtherApps)
+                    }
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 9))
+                        Text("Terminal")
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                    .foregroundColor(termHovered ? Color.white : Color(hex: "#CBD5E1"))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+                    .background(termHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.06))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+                    .scaleEffect(termHovered ? 1.03 : 1.0)
+                }
+                .buttonStyle(.plain)
+                .onHover { termHovered = $0 }
+                .help("Jump to Terminal")
+            }
+
+            // Bottom Subtext: Connection / Model info
+            HStack(spacing: 4) {
+                Text("\(state.currentModelOption.provider) · \(state.selectedEffort.capitalized)")
+                    .font(.system(size: 9))
+                    .foregroundColor(Color(hex: "#64748B"))
+                Spacer()
+                Text("Ultra")
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundColor(Color(hex: "#38BDF8").opacity(0.8))
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+}
+
 struct AgentPillsView: View {
     @ObservedObject var state: AppState
     @State private var swapping = false
@@ -2343,22 +3086,26 @@ struct AgentPillsView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(displayTasks) { task in
-                    AgentPill(task: task, state: state, swapping: $swapping) {
-                        swapping = true
-                        state.setFocus(task.id)
-                        SoundEngine.shared.play("blip")
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
+        if displayTasks.isEmpty {
+            GeminiQuickActionsView(state: state)
+        } else {
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                LazyVGrid(columns: columns, spacing: 4) {
+                    ForEach(displayTasks) { task in
+                        AgentPill(task: task, state: state, swapping: $swapping) {
+                            swapping = true
+                            state.setFocus(task.id)
+                            SoundEngine.shared.play("blip")
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
+                        }
                     }
                 }
+                .padding(.horizontal, 8)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -2370,7 +3117,7 @@ struct AgentPill: View {
     @State private var isHovered = false
 
     private var displayName: String {
-        task.id == "integration_claude" ? "Antigravity" : task.name
+        (task.id == "integration_gemini" || task.id == "integration_claude") ? "Antigravity" : task.name
     }
 
     var body: some View {
@@ -2493,36 +3240,61 @@ struct CardBackground<Content: View>: View {
 
     var washColor: Color {
         switch wash {
-        case .red:    return Color(hex: "#F4505E").opacity(0.55)
-        case .green:  return Color(hex: "#34D399").opacity(0.5)
-        case .pink:   return Color(hex: "#F472B6").opacity(0.55)
-        case .amber:  return Color(hex: "#F5A524").opacity(0.42)
-        case .cyan:   return Color(hex: "#22D3EE").opacity(0.38)
-        case .indigo: return Color(hex: "#6366F1").opacity(0.5)
-        case .soft:   return Color.white.opacity(0.08)
+        case .red:    return Color(hex: "#F43F5E").opacity(0.45)
+        case .green:  return Color(hex: "#10B981").opacity(0.40)
+        case .pink:   return Color(hex: "#EC4899").opacity(0.42)
+        case .amber:  return Color(hex: "#F59E0B").opacity(0.40)
+        case .cyan:   return Color(hex: "#06B6D4").opacity(0.35)
+        case .indigo: return Color(hex: "#6366F1").opacity(0.45)
+        case .soft:   return Color.white.opacity(0.07)
         case nil:     return Color.clear
+        }
+    }
+
+    var washGlow: Color {
+        switch wash {
+        case .amber:  return Color(hex: "#D97706").opacity(0.22)
+        case .indigo: return Color(hex: "#3B82F6").opacity(0.22)
+        case .cyan:   return Color(hex: "#0EA5E9").opacity(0.22)
+        case .green:  return Color(hex: "#059669").opacity(0.22)
+        case .red:    return Color(hex: "#E11D48").opacity(0.22)
+        default:      return Color.clear
         }
     }
 
     var body: some View {
         ZStack {
+            // Obsidian dark glass
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color(hex: "#141518"))
+                .fill(Color(hex: "#0E1017").opacity(0.94))
                 .overlay(
                     RadialGradient(
                         gradient: Gradient(stops: [
                             .init(color: washColor, location: 0),
-                            .init(color: .clear, location: 0.7)
+                            .init(color: washGlow, location: 0.35),
+                            .init(color: .clear, location: 0.75)
                         ]),
-                        center: UnitPoint(x: 0.5, y: 1.3),
+                        center: UnitPoint(x: 0.5, y: 1.25),
                         startRadius: 0,
-                        endRadius: 280
+                        endRadius: 320
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                 )
+                // Specular Apple glass edge sheen
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                        .stroke(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: Color.white.opacity(0.15), location: 0),
+                                    .init(color: Color.white.opacity(0.04), location: 0.6),
+                                    .init(color: Color.clear, location: 1.0)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
                 )
 
             if let content = content {
@@ -2541,22 +3313,34 @@ extension CardBackground where Content == EmptyView {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color(hex: "#141518"))
+                .fill(Color(hex: "#0E1017").opacity(0.94))
                 .overlay(
                     RadialGradient(
                         gradient: Gradient(stops: [
                             .init(color: washColor, location: 0),
-                            .init(color: .clear, location: 0.7)
+                            .init(color: washGlow, location: 0.35),
+                            .init(color: .clear, location: 0.75)
                         ]),
-                        center: UnitPoint(x: 0.5, y: 1.3),
+                        center: UnitPoint(x: 0.5, y: 1.25),
                         startRadius: 0,
-                        endRadius: 280
+                        endRadius: 320
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                        .stroke(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: Color.white.opacity(0.15), location: 0),
+                                    .init(color: Color.white.opacity(0.04), location: 0.6),
+                                    .init(color: Color.clear, location: 1.0)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
                 )
         }
     }
@@ -2583,13 +3367,31 @@ struct CodeBlock: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 12, design: .monospaced))
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(Color.white.opacity(0.07))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06)))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .foregroundColor(Color(hex: "#E8E9EC"))
+        HStack(spacing: 6) {
+            Text("$")
+                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                .foregroundColor(Color(hex: "#38BDF8"))
+            Text(text)
+                .font(.system(size: 11.5, design: .monospaced))
+                .foregroundColor(Color(hex: "#F1F5F9"))
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(hex: "#06080F").opacity(0.85))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.12), Color(hex: "#38BDF8").opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -2697,61 +3499,111 @@ struct ShimmerOverlay: View {
 
 struct PrimaryButton: View {
     let title: String
+    let icon: String?
     let kbd: String?
     let action: () -> Void
+    @State private var isHovered = false
 
-    init(_ title: String, kbd: String? = nil, action: @escaping () -> Void) {
-        self.title = title; self.kbd = kbd; self.action = action
+    init(_ title: String, icon: String? = nil, kbd: String? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.kbd = kbd
+        self.action = action
     }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 7) {
-                Text(title).font(.system(size: 12.5, weight: .medium))
+            HStack(spacing: 6) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(title)
+                    .font(.system(size: 12.5, weight: .semibold))
                 if let k = kbd {
-                    Text(k).font(.system(size: 10.5))
+                    Text(k)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .padding(.horizontal, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.black.opacity(0.4)))
-                        .opacity(0.55)
+                        .padding(.vertical, 1)
+                        .background(Color.white.opacity(0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
-            .padding(.horizontal, 13).padding(.vertical, 7)
-            .background(Color(hex: "#F5F6F8"))
-            .foregroundColor(Color(hex: "#0B0C0E"))
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .background(
+                LinearGradient(
+                    colors: [Color(hex: "#3B82F6"), Color(hex: "#6366F1")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .foregroundColor(.white)
             .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.28), lineWidth: 1)
+            )
+            .shadow(color: Color(hex: "#3B82F6").opacity(isHovered ? 0.5 : 0.25), radius: isHovered ? 8 : 4, x: 0, y: 2)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovered)
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
 
 struct SecondaryButton: View {
     let title: String
+    let icon: String?
     let kbd: String?
     let action: () -> Void
+    @State private var isHovered = false
 
-    init(_ title: String, kbd: String? = nil, action: @escaping () -> Void) {
-        self.title = title; self.kbd = kbd; self.action = action
+    init(_ title: String, icon: String? = nil, kbd: String? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.kbd = kbd
+        self.action = action
     }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 7) {
-                Text(title).font(.system(size: 12.5, weight: .medium))
+            HStack(spacing: 6) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .medium))
+                }
+                Text(title)
+                    .font(.system(size: 12.5, weight: .medium))
                 if let k = kbd {
-                    Text(k).font(.system(size: 10.5))
+                    Text(k)
+                        .font(.system(size: 10, design: .monospaced))
                         .padding(.horizontal, 4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.white.opacity(0.4)))
-                        .opacity(0.55)
+                        .padding(.vertical, 1)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .opacity(0.6)
                 }
             }
             .padding(.horizontal, 13).padding(.vertical, 7)
-            .background(Color.white.opacity(0.09))
-            .foregroundColor(Color(hex: "#F1F2F4"))
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.06))
+            )
+            .foregroundColor(Color(hex: "#E2E8F0"))
             .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(isHovered ? 0.20 : 0.08), lineWidth: 1)
+            )
+            .scaleEffect(isHovered ? 1.02 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isHovered)
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
+
 
 struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -2835,6 +3687,21 @@ struct SettingsIslandView: View {
                     StatusBadge(label: "Hooks", ok: antigravityConnected)
                     StatusBadge(label: "agy CLI", ok: cliConnected)
                     Spacer()
+                    Button {
+                        if let url = URL(string: "https://github.com/e404r") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.system(size: 9))
+                            Text("e404r")
+                        }
+                    }
+                    .font(.system(size: 11.5))
+                    .foregroundColor(Color(hex: "#8E939C"))
+                    .buttonStyle(.plain)
+
                     Button("Settings…") {
                         NotificationCenter.default.post(name: .openFullSettings, object: nil)
                     }
